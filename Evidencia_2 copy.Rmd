@@ -1,0 +1,1354 @@
+---
+title: "Evidencia 2: Informe de consultoría "
+subtitle: "Planeación estratégica basada en analítica prescriptiva"
+author: "Equipo 3"
+date: '`r Sys.Date()`'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: "spacelab"
+    code_folding: show
+    toc_float:
+      smooth_scroll: true
+      collapsed: true
+editor_options: 
+  chunk_output_type: inline 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=F,warning=F)
+pacman::p_load(tidyverse,ggplot2,dplyr,magrittr,data.table,sqldf)
+pacman::p_load(sf,RColorBrewer,leaflet.extras2,readxl,forecast,tseries)
+pacman::p_load(ggpubr,visdat,stringr,corrplot)
+pacman::p_load(tigris,maptools,spdep,rgdal,mapview,googleway,ggmap)
+```
+
+```{r include=FALSE}
+spectral <- c("#9E0142", "#D53E4F","#F46D43", "#FDAE61" ,"#FEE08B"  ,"#DFF27D" , "#90D289" ,"#66C2A5" ,"#3288BD","#5E4FA2")
+spectral2 <- c("#C92C3E","#E4969F","#F98E52" ,"#FED872" ,"#DFF27D" ,"#90D289","#65B540","#55C1A0","#3288BD","#7494EA","#5E4FA2")
+colores <- c("#5EA7D4","#7769B5") 
+colores2 <- c("#90D289" ,"#65B540","#55C1A0","#58B09C","#3288BD","#A6BAF2","#7494EA","#7769B5","#5E4FA2")
+n <- c("#BD4F6C","#CF6D62","#C96365","#D98B7D","#D4775E","#DF926E","#EAAC7D","#F5C78D")
+n2 <- c("#CE6A85","#FD976B","#45100C")
+```
+
+# **Antecedentes del caso**
+Datlas es una startup de analítica dedicada a desarrollar soluciones para transformar datos en inteligencia de negocios a través del desarrollo de un ecosistema de contenido, plataformas digitales y métodos que se apalancan en técnicas de inteligencia artificial. Como parte de nuestro reto de planeación estratégica, Datlas nos presenta el caso de “Alimentos y Snack Monterrey” (A&S). 
+
+La empresa de “Alimentos y Snack Monterrey” se dedica a la fabricación y distribución de productos alimenticios con enfoque a restaurantes, hoteles, catering y cafeterías. Actualmente esta empresa está en fase de expansión por lo que acudieron a nosotros con el fin de crearles una estrategia de crecimiento donde ellos puedan atender más negocios, desplazar más productos y aumentar sus ventas recurrentes.
+
+# **Objetivos y alcances** 
+
+Alimentos y Snack Monterrey tiene la mira en el objetivo de expansión, sin embargo ya teniendo un mejor contexto de su situación actual se concluye que su meta no es la expansión sino la adquisición de clientes para aumentar su cuota del mercado. Teniendo esto en mente, nuestro objetivo es poder desarrollar una estrategia que pueda combinar tanto los objetivos como las necesidades del negocio. Esto incluye:
+
+* **Aumento de cuota de mercado y ventas**: Buscamos realizar un exhaustivo análisis del mercado/industria el cual participa el negocio y determinar cuál es su cuota de mercado actual. Una vez identificado esto definimos cuáles serían los clientes prospectos ideales para aumentar su participación y puedan aumentar sus ventas.  
+
+* **Retención de clientes activos**: Buscamos retener a los clientes activos actuales ya que estos representan un factor crítico de éxito para la empresa. Para esto, se analizará los demográficos, el comportamiento y se identificarán los patrones de compra de los clientes activos. Esto con el fin de crear estrategias de retención, personalización y seguimiento de las necesidades.
+
+* **Potenciar el catálogo de productos**: Buscamos potenciar el catálogo de productos considerando la recurrencia y las ganancias de cada productos. Utilizando el modelo market basket buscamos identificar los productos y órdenes más frecuentes y rentables para el negocio. Con esta información se crearán estrategias para la personalización de la oferta y demanda de productos y elegiremos clientes prospectos que puedan impulsar el catálogo actual.
+
+# **Análitica descriptiva** 
+Considerando el objetivo central, se examinaron los datos de la empresa donde se identificaron 5 bases de datos, de las cuales 4 son internas y contienen información sobre clientes actuales, pedidos, catálogo de productos y detalles de las órdenes y otra base de datos externa que incluye prospectos a los que les gustaría expandirse. Además de las bases de datos internas, también se investigaron fuentes externas para evaluar el desempeño de la industria, identificar mercados objetivo y analizar las oportunidades de crecimiento en ellos.
+
+## *Bases de datos internas* {.tabset}
+Se realizó una exhaustiva limpieza a cada bases de datos donde se ajustaron los tipos de datos de las variables, se completaron los datos faltantes según las necesidades, se eliminaron variables con un alto número de valores faltantes, se corrigieron los factores y se crearon variables adicionales relevantes para la categorización y agrupamiento de la información. 
+
+### **Catalogo** 
+```{r}
+catalogo <- fread("catalogo.csv")
+```
+
+En Catálogo hay:
+
+- **mls**: Describe al producto (mililitros)
+- **gms**: Describe al producto (gramos)
+- **precio_unidad**: Precio de 1 unidad 
+- **familia**: familia del producto
+- **categoria**: categoría del producto
+- **sku**: sku del producto
+- **id_producto**: Id del producto
+- **nombre**: Nombre del producto
+- **activo**: si está activo o no
+
+#### *Limpieza y feature engineering* 
+```{r}
+# Eliminación de variables no relevantes 
+catalogo  %<>% dplyr::select(-sku,-mls,-gms,-activo)
+```
+
+```{r fig.align='center'}
+# Nueva variable 
+# Solo hay 2 categorías de producto en la familia categoría. Para un mejor análisis, estas variables se juntarán.
+catalogo %<>%  unite(Categoria_Familia,categoria, familia, sep = "_") 
+catalogo %>% count(Categoria_Familia,sort=T) %>% mutate(Frecuencia = scales::percent( n /sum(n)))  %>% rmarkdown::paged_table()
+```
+
+#### *Vizualización*
+
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 1.** Distribución de Precios en Catálogo'}
+ggplot(catalogo,aes(precio_unidad)) + geom_histogram(color="#5E9FD4",fill="#7EB2DD") + theme_light() + labs(title="Distribución del Precio Unitario")  +xlab("")+ylab("") +theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 2.** Distribución de Precios en Catálogo'}
+ggplot(catalogo,aes(x= Categoria_Familia, y= precio_unidad,color=Categoria_Familia)) +
+  theme_light()  + scale_color_manual(values = colores2)  +
+  labs(title="Distribución de Precio Unitario",subtitle = "Por Categoría")+ylab("Ventas ")+xlab("Unidades")  +
+  theme(legend.position="", axis.text.x = element_text(angle = 90, vjust = 1, hjust=1)) +  
+  geom_jitter(width = .3, alpha = .7,size=2.5) +theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Vizualización Final 
+glimpse(catalogo)
+```
+
+### **Detalle**  
+```{r}
+detalle <- read_csv("detalle.csv") %>% dplyr::select(-id_detalle)
+```
+
+En detalle tenemos cada ticket a nivel producto por ticket. La base incluye:
+
+- **id_detalle**: el id de cada producto de cada transacción. Se eliminará esta variable.
+- **id_pedido**: el id de cada pedido
+- **id_producto**: el id de cada producto dentro de esa transacción
+- **cantidad**: la cantidad de unidades de ese producto
+
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 3.** Cantidad de Productos por Ticket'}
+#La mayoría de los productos se tienden a ordenar de entre 15 a 30 piezas.
+ggplot(detalle,aes(cantidad)) + geom_histogram(color="#5E9FD4",fill="#7EB2DD") +theme_light() +
+  labs(subtitle="Cantidad de Productos por Ticket")  +xlab("")+ylab("") + scale_y_continuous(labels = scales::comma) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### **Pedido** 
+```{r}
+pedido <- read_csv("pedido.csv")
+```
+
+En Pedido hay:
+
+- **id_pedido**: el id de cada pedido
+- **id_cliente** el id del cliente que hizo la compra
+- **fechapedido**: la fecha en la que se hizo el pedido
+- **fechaeentrega**: la fecha en la que se hizo la entrega
+- **cancelado**: si la venta fue cancelada o no.
+
+#### *Limpieza y feature engineering* 
+```{r fechas}
+# Se transformarán las fechas a el tipo de dato correcto y se hará una columna que mida cuántos días se tardó cada orden. 
+# Se usará mes y año como factor. Se eliminará fechaentrega
+pedido %<>% mutate( fechapedido = as.Date(pedido$fechapedido, format = "%d/%m/%y"),
+                    fechaentrega= as.Date(pedido$fechaentrega, format = "%d/%m/%y"),
+                    tiempo = as.factor(fechaentrega-fechapedido))
+pedido %<>% mutate( año_pedido = as.factor(format(pedido$fechapedido, "%Y"))) 
+```
+
+```{r}
+# Hay 42 pedidos  sin fecha de entrega. 
+# Estos no tienen la fecha por el corte en la recolección de datos, por lo que NA days se reemplazará como En curso.
+pedido %>% filter(is.na(tiempo)) %>% dplyr::select(fechapedido,fechaentrega,id_pedido) %>% rmarkdown::paged_table()
+```
+
+```{r}
+# El tiempo de entrega es entre 1 y 3 días, con el 82% de los pedidos son entregados en entre 1 y 2 días.
+pedido %<>% mutate(tiempo=as.factor(ifelse(is.na(tiempo),"En curso",tiempo)))%>% dplyr::select(-fechaentrega)
+pedido %>% count(tiempo)  %>% mutate(Frecuencia = scales::percent( n /sum(n),accuracy = 0.1))  %>% rmarkdown::paged_table()
+```
+
+```{r}
+# Solo el 5% de los pedidos han sido cancelados.
+pedido %>% count(cancelado) %>% mutate(Frecuencia = scales::percent( n /sum(n)))  %>% rmarkdown::paged_table()
+pedido %<>% mutate(cancelado=as.factor(cancelado))
+```
+
+```{r}
+# Vizualización Final 
+glimpse(pedido)
+```
+
+### **Clientes** 
+```{r}
+clientes <- read_csv("clientes.csv")
+```
+
+En Clientes hay:
+
+- **id_cliente**: llave conectora
+- **lat y long**: latitdud y longitud
+- **nom_estab y raz_social**: Nombre del negocio y su razón social
+- **per_ocu**: La ocupación de cada cliente
+- **tipo_vial, nom_vial**: Información de la ubicación (tipo de calle y nombre de la calle)
+- **edificio, edificio_e**: Información de la ubicación
+- **tipo_asent, nomb_Asent**: Información de la ubicación
+- **tipoCenCom, nom_CenCom, num_local**: Información de la ubicación si está en un centro comercial
+- **cod_postal,cve_ent,entidad**: Información de la ubicación, estado en el que está
+- **cve_mun,municipio**: Muncipio en el que está
+- **cve_loc, ageb, manzana**: Información de la ubicación
+
+#### *Limpieza y feature engineering* 
+```{r}
+# Eliminación de variables no relevantes 
+clientes %<>% dplyr::select(-raz_social,-tipoCenCom,-nom_CenCom,-num_local,-nom_vial,-tipo_vial,-edificio,-edificio_e,
+                             -tipo_asent,-nomb_asent,-cve_ent,-entidad,-cod_postal,-cve_loc,-manzana)
+```
+
+Para el análisis geográfico es necesario usar cve_mun con 3 dígitos. Los que no tienen 3 en total tendrán uno o 2 0's al principio.
+\
+```{r}
+#Para el análisis geográfico es necesario usar cve_mun con 3 dígitos. Los que no tienen 3 en total tendrán uno o 2 0's al principio.
+clientes %<>% mutate(cve_mun =
+                   ifelse(nchar(cve_mun)==2,paste0("0",cve_mun),
+                          ifelse(nchar(cve_mun)==1,paste0("00",cve_mun),cve_mun)))
+```
+
+Se creará una nueva variable para clasificar a los clientes según su actividad (Restaurante o Hotel) a partir del nombre del establecimiento. 
+\
+```{r}
+clientes$actividad <- grepl("RESTAURANTE", clientes$nom_estab, ignore.case = TRUE)
+clientes$actividad <- as.factor(clientes$actividad)
+clientes %<>% mutate(actividad = forcats::fct_collapse(clientes$actividad,
+                                             "Restaurante" =  c("TRUE"),
+                                             "Hotel" = c("FALSE"))) 
+clientes %>% count(actividad,sort=T)%>%   mutate(Frecuencia = scales::percent( n /sum(n))) %>% rmarkdown::paged_table()
+```
+
+A partir de los pedidos hechos en pedido se creará una variable que determine si el cliente es activo o no. Si el cliente ha hecho mínimo una compra se catalogará como activo.
+```{r}
+detallec <- pedido %>% count(id_cliente,sort=T) %>% dplyr::select(id_cliente)
+detallec <- as.list(detallec$id_cliente)
+clientes %<>% mutate(Estatus = as.factor(ifelse(id_cliente%in%detallec,"Activo","Pasivo")))
+rm(detallec)
+clientes %>% count(Estatus,sort=T)%>%   mutate(Frecuencia = scales::percent( n /sum(n)))  %>% rmarkdown::paged_table()
+#Dentro de los 100 clientes, 56 son activos. El cliente que más ha hecho pedidos es el 24 	RESTAURANTE ARIECCHINO, con 862 pedidos y el que menos ha hecho es el cliente 2  RESTAURANTE FINOS, con 236 pedidos.
+```
+
+#### *Consultas* 
+
+```{r}
+# El 50% de los clientes son de Monterrey.
+clientes %>% count(municipio,cve_mun,sort=T)  %>% mutate(Frecuencia = scales::percent( n /sum(n)))  %>% rmarkdown::paged_table()
+```
+
+```{r}
+# El 73% de los clientes tienen una ocupación de entre 1 a 10 personas.
+clientes %>% count(per_ocu,sort=T) %>% mutate(Frecuencia = scales::percent( n /sum(n)))  %>% rmarkdown::paged_table()
+clientes %<>% mutate(per_ocu =as.factor(per_ocu))
+```
+
+```{r}
+# Repitiendo el conteo de clientes por municipio tomando en cuenta el estatus del cliente, podemos ver que no hay clientes activos en Cadereyta ni en Juárez.
+table(clientes$municipio,clientes$Estatus)
+```
+
+```{r}
+# Vizualización Final 
+glimpse(clientes)
+```
+
+#### *Mapas* 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ageb <- readOGR("AGEB/agebsZMM.shp")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+mun <- readOGR("Municipios ZMM/municipiosZMM.shp")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+municipio <- read_sf("Municipios ZMM/municipiosZMM.shp")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+clientes1<- read.csv("clientes_e2.csv")
+base <- read.csv("base_limpia.csv")
+
+clientes1 %<>% 
+  mutate(cve_mun =ifelse(nchar(cve_mun)==2,paste0("0",cve_mun),ifelse(nchar(cve_mun)==1,paste0("00",cve_mun),cve_mun))) 
+base %<>%
+  mutate(cve_mun =ifelse(nchar(cve_mun)==2,paste0("0",cve_mun),ifelse(nchar(cve_mun)==1,paste0("00",cve_mun),cve_mun)))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+clientes_mty <- geo_join(mun,clientes1,"CVE_MUN","cve_mun",how="inner")
+clientes_mty2 <- merge(municipio,clientes1,by.x="CVE_MUN",by.y="cve_mun")
+clientes_ageb <- geo_join(ageb,clientes1,"AGEB","ageb",how="inner")
+```
+
+```{r}
+# Ventas clientes activos por AGEB
+mapview(clientes_ageb,"ventas_cliente")
+```
+
+```{r}
+# Ventas clientes activos por Municipio 
+mapview(clientes_mty,"ventas_cliente")
+```
+
+```{r}
+# Plot de clientes activos y pasivos
+ggplot() +
+  geom_sf(data = clientes_mty2) + 
+  geom_point(data = clientes1, aes(x = long, y = lat, color = Estatus), size = 2.5,alpha=1)+
+  labs(title="Tipo de Cliente\n")+
+  theme_void() +  
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        legend.position = "top",
+        plot.title = element_text(hjust = 0.5))  + scale_color_manual(values = n2) 
+```
+
+### **Unión**
+Una vez con la información limpia, se unieron las bases correspondientes de la siguiente manera: 
+
+* La base de datos Catálogo se une con la base de datos Detalles mediante el ID de productos, formando así la unión Base 1. 
+* La base de datos Clientes se une con la base de datos Pedidos a través del ID de clientes, generando la unión Base 2. 
+* Ambas bases se unen mediante el ID pedido, lo que resulta en la combinación de las cuatro bases de datos.
+
+![](MER.jpg)
+```{r}
+base1 <- merge(detalle,catalogo, by.x = "id_producto", by.y = "id_producto", all.x = T)
+base2 <- merge(pedido,clientes, by.x = "id_cliente", by.y = "id_cliente", all.X = T)
+base <- merge(base1,base2, by.x = "id_pedido", by.y = "id_pedido", all.x = T)
+rm(base1,base2,catalogo,detalle,pedido)
+```
+
+#### *Nuevas variables* 
+Una vez generada la unión procedimos a crear más variables que son de gran relevancia para el análisis exploratorio como lo son las variables de ventas por cliente, ticket, producto y general. Debido a que nuestras bases de datos tienen mayormente datos descriptivos (factores) tener esta variable numérica de ventas nos permitió desarrollar insights de valor para la creación de nuestra estrategia de crecimientos y expansión para Alimentos y Snack Monterrey. 
+
+##### Ventas por detalle (producto en ticket)
+```{r}
+# Venta: representa las ventas $ por producto en el ticket.
+base$ventas <- base$cantidad * base$precio_unidad
+```
+
+##### Ventas por ticket
+```{r}
+# Se crean las variables de total monetario y total unitario de cada ticket.
+base %<>% group_by(id_pedido) %>%  mutate(cantidad_pedido = sum(cantidad),
+            ventas_pedido = sum(ventas)) %>% ungroup()
+```
+
+##### Ventas por cliente
+```{r}
+# Ahora se crean variables del total por cada cliente. Se crean las variables de total monetario y total unitario de cada ticket.
+base %<>% group_by(id_cliente) %>% mutate(cantidad_cliente = sum(cantidad_pedido),
+            ventas_cliente = sum(ventas_pedido)) %>% ungroup()
+```
+
+```{r}
+totales <- base %>% dplyr::select(id_cliente,cantidad_cliente,ventas_cliente)
+totales <- distinct(totales)
+clientes<- merge(clientes,totales, by.x = "id_cliente",by.y = "id_cliente",all=T)
+rm(totales)
+```
+
+```{r}
+skimr::skim(base)
+```
+
+#### *Vizualización* 
+
+##### **Ventas**
+
+###### Totales Por cliente
+¿Cómo se han comportado los clientes históricamente? Aquí podemos ver una clara división entre los clientes.
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráficos 4 y 5.** Totales por Cliente (Distribución y Unidades)'}
+ventas <- ggplot(clientes,aes(ventas_cliente)) + geom_histogram(color="#5E9FD4",fill="#7EB2DD") +theme_light() + labs(title="Ventas  totales de Clientes")  +xlab("")+ylab("") + scale_x_continuous(labels = scales::comma) +
+  theme(plot.title = element_text(hjust = 0.5))
+options(scipen = 999)
+ventas2 <- ggplot(clientes,aes(y= ventas_cliente,x=cantidad_cliente)) +
+  geom_point(size=5, shape= 21,color="#5E9FD4",fill="#7EB2DD")   +
+  labs(title="Ventas totales de Clientes",subtitle = "")+ylab("ventas")+xlab("cantidad")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5)) + 
+  scale_y_continuous(labels = scales::comma) +theme_light() 
+cowplot::plot_grid(ventas,ventas2,ncol=1)
+```
+
+###### Totales por Tipo de comercio
+Esta división se ve en tipo de comercio. Existen más restaurantes con menos ventas, mientras que hay más hoteles con más ventas
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 6.** Totales por Cliente Según el Comercio'}
+ggplot(clientes,aes(x= actividad, y= ventas_cliente,color=actividad)) +
+  theme_light()   + scale_color_manual(values = colores) +
+  labs(title="Ventas totales de Clientes",subtitle = "Por tipo de Comercio")+ylab("")+xlab("")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5)) +  
+  geom_jitter(width = .3, alpha = .8,size=4)  + scale_y_continuous(labels = scales::comma)
+```
+
+###### Totales Por Municipio
+Como podemos ver, tanto en Apodaca como Salinas Victoria solo hay perfiles que gastan menos, mientras que en Santiago hay un perfil que gasta más.
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 7.** Totales por Cliente Según su Municipio'}
+clientes %>% filter(Estatus=="Activo") %>% droplevels() %>% 
+  ggplot(aes(x= municipio, y= ventas_cliente,color=municipio)) +
+  theme_light() + scale_color_manual(values = colores2) +
+  labs(title="Ventas totales de Clientes",subtitle = "Por Municipio")+ylab("")+xlab("")  +
+  theme(legend.position="",axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))+
+  geom_jitter(width = .2, alpha = 1,size=2.5)  + scale_y_continuous(labels = scales::comma)
+```
+
+###### Totales por ocupación
+Los clientes con ocupación de 31 a 50 personas gastan menos.
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 8.** Totales por Cliente Según su Municipio'}
+clientes %>% filter(Estatus=="Activo") %>% droplevels() %>% 
+  ggplot(aes(x= per_ocu, y= ventas_cliente,color=per_ocu)) +
+  theme_light()  + scale_color_manual(values = colores2)  +
+  labs(title="Ventas totales de Clientes Activos",subtitle = "por Ocupación")+ylab("")+xlab("")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5)) +  
+  geom_jitter(width = .3, alpha = .8,size=3) + scale_y_continuous(labels = scales::comma)
+```
+
+###### Encontrando patrones (correlación)
+Como podemos ver, existen 2 grupos pero no hay patron, los clasificaremos y veremos como afecta. La mitad de los clientes activos gastan menos
+\
+```{r}
+clientes  %<>% mutate(Tipo = as.factor(ifelse(ventas_cliente>20000000,"1","0")))
+clientes %>% count(Tipo,sort=T) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>% na.omit()  %>% rmarkdown::paged_table()
+```
+\
+Como podemos observar, fuera de las ventas lo que más afectan son los municipios en los que sabemos que no hay perfiles de bajo gasto.
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Correlación 1.** Perfil de Gasto'}
+cor <- clientes %>% filter(Estatus=="Activo") %>% dplyr::select(-cve_mun,-lat,-long,-id_cliente,-nom_estab,-localidad,-ageb,-Estatus) %>% mutate(municipio=as.factor(municipio)) %>% droplevels()
+cor <- model.matrix(~0+., data=cor) 
+cor <- round(cor(cor),4)
+corrplot::corrplot(cor,method = 'color', order = 'original', tl.srt=90,tl.col="black",cl.pos = 'b', 
+                   addgrid.col = 'white',tl.cex =0.75)
+```
+
+```{r}
+base  %<>% mutate(Tipo = as.factor(ifelse(ventas_cliente>20000000,"Alto","Bajo"))) 
+```
+
+##### **Tickets**
+
+###### Total del ticket y Total del ticket por tipo de cliente
+Como es esperado, los totales del ticket de los clientes que gastan menos son menores.
+\
+```{r fig.align='center',warning=FALSE,out.width='85%',fig.cap='**Gráfico 10 y 11.** Totales por Ticket Según el Tipo de Cliente'}
+aa <- base %>% dplyr::select(id_cliente,ventas_pedido,Tipo) %>% distinct() %>% 
+ggplot(aes(ventas_pedido)) + geom_histogram(color="#5E9FD4",fill="#7EB2DD") +theme_light() + 
+  labs(title="Totales de Ticket")  +xlab("")+ylab("") + scale_x_continuous(labels = scales::comma) +
+  facet_wrap(~Tipo,ncol=2) +theme(plot.title = element_text(hjust = 0.5))
+options(scipen = 999)
+bb <- base %>% 
+  dplyr::select(Tipo,id_pedido,cantidad_pedido,ventas_pedido) %>% distinct() %>%  ggplot(aes(y= ventas_pedido,x=cantidad_pedido,fill=Tipo)) +
+  theme_light() +geom_point(size=2, shape= 21)  + scale_color_manual() +
+  labs(title="Ticket",subtitle = "")+ylab("ventas")+xlab("cantidad")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5))  +
+  scale_y_continuous(labels = scales::comma) + scale_x_continuous(labels = scales::comma) +
+  geom_smooth(color="black", alpha=4, size=1, fill="#D9F7FA") + scale_fill_manual(values = colores) + facet_wrap(~Tipo) 
+cowplot::plot_grid(bb,aa,ncol = 1)
+```
+
+###### Total del ticket por tipo de comercio
+Esto también se refleja en el tipo de comercio. 
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 12.** Totales Según Tipo y Comercio'}
+ base %>% dplyr::select(Tipo,actividad,id_pedido,cantidad_pedido,ventas_pedido) %>% distinct() %>% droplevels() %>% 
+  ggplot(aes(x= ventas_pedido,y=actividad,color=actividad)) +
+  theme_light()  + scale_color_manual(values = colores2)  +
+  labs(title="Tickets Por Tipo de Comercio")+ylab("")+xlab("")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5)) +  
+  geom_jitter(width = .15, alpha = 0.8,size=1) + scale_x_continuous(labels = scales::comma)  + facet_wrap(~Tipo,ncol=1)
+```
+
+###### Total del ticket por municipio
+Al igual que en los municipios.
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 13.** Totales Según Tipo y Municipio'}
+base %>% dplyr::select(Tipo,municipio,id_pedido,cantidad_pedido,ventas_pedido) %>% 
+  distinct() %>% droplevels() %>% ggplot(aes(x= ventas_pedido,y=municipio,color=municipio)) + 
+  geom_jitter(width = .05, alpha = 0.8,size=0.8)+
+  theme_light()  + scale_color_manual(values = colores2)  +
+  labs(title="Tickets por Municipio")+ylab("")+xlab("")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5)) +  
+  scale_x_continuous(labels = scales::comma)  + facet_wrap(~Tipo,ncol=1)
+```
+
+###### Total del ticket por ocupación
+También en ocupación. 
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 14.** Totales Según Tipo y Ocupación'}
+base %>% dplyr::select(Tipo,per_ocu,id_pedido,cantidad_pedido,ventas_pedido) %>% distinct() %>% droplevels() %>% 
+  ggplot(aes(x= ventas_pedido,y=per_ocu,color=per_ocu)) +
+  theme_light()  + scale_color_manual(values = colores2)  +
+  labs(title="Tickets por Ocupación")+ylab("")+xlab("")  +
+  theme(legend.position="",plot.title = element_text(hjust = 0.5)) +  
+  geom_jitter(width = .1, alpha = .8,size=1) + scale_x_continuous(labels = scales::comma)  + facet_wrap(~Tipo,ncol=1)
+```
+
+### **Insights**
+Despues de realizar el análisis exploratorio, encontramos los siguientes insights:
+
+**Insights generales: **
+
+* El total de ventas durante el periodo comprendido entre 2020 y 2023 fue de $249,965,677 MXN. Al excluir las órdenes canceladas, el total de ventas se reduce a 237,278,744 MXN.
+* Al analizar las ventas anuales, se observa una ligera disminución en su valor. En promedio, las ventas experimentan una disminución del 0.31% cada año.
+* Se identificaron dos clusters de clientes por sus diferentes patrones  de compras. Un grupo tiene un rango de compras de 34 a 40 millones mientras que el otro grupo tiene un rango de compras de 10 a 15 millones. 
+
+**Insights de productos: **
+
+* En el catálogo de productos, se destaca que el 53% de los productos pertenecen a la familia animal,seguido de sazón con 12% y vegetal con 10%.
+* Por otro lado, se observa que el 54%  de los productos son de la categoría de congelados y el otro 46% es de categoría normal. 
+* En términos de precios, el 75% de los productos tienen un valor de $124 MXN. El rango de precios va desde los $12 a los $250 pesos MXN. 
+* Al calcular las ganancias de los productos (Top-Bottom) se concluyó que todos los productos del catálogo son rentables por lo que no habría que hacer una limpieza de catálogo.
+
+**Insights de pedidos: **
+
+* La mayoría de los productos suelen ordenarse en entre 15 y 30 piezas.
+* El tiempo de entrega de las órdenes es entre 1 y 3 días. Sin embargo, el 82% de los pedidos son entregados en entre 1 y 2 días, sin importar la ubicación de entrega.
+* A lo largo de los 4 años de servicio, solo el 5% de los pedidos han sido cancelados, lo que representa un total de 12,686,933 MXN.
+* El mayor número de pedidos registrado es de 862, mientras y el menor es de 236 pedidos.
+
+**Insights de los clientes: **
+
+* De los 100 clientes actuales, 56 se consideran clientes activos debido a su frecuencia de compra y los otros 44 clientes son pasivos, ya que no se tiene registro de órdenes.
+* Las ventas totales provienen únicamente de los clientes activos
+* Todos sus clientes están catalogados como restaurantes y hoteles donde el 76% son restaurantes y el 24% son hoteles. 
+* De los clientes activos 45 son restaurantes y 11 son hoteles
+* De los clientes pasivos 31 son restaurantes y 13 son hoteles
+* Se observó que la mitad de los clientes están ubicados en Monterrey, mientras que la otra mitad se distribuye entre los municipios de Apodaca, Cadereyta, Escobedo, Guadalupe, Juárez, San Nicolás, San Pedro, Santa Catarina y Santiago.
+
+
+
+
+## *Bases de datos externas* {.tabset}
+Dado que nuestra meta es la expansión, un factor esencial a considerar es el comportamiento externo de la empresa. En otras palabras, como esta la industria en la que participa, que mercado atiende, cuál es la demanda y oferta actual y potencial de crecimiento dentro de la misma.  
+\
+Para esto, se utilizó la base de datos del Directorio Estadístico Nacional de Unidades Económicas (DENUE) del 2023 de comercio al por mayor de abarrotes, alimentos, bebidas, hielo y tabaco y datos de reportes del INEGI y ENIGH. Todos los insights encontrados se complementarán con los insights internos para la creación de estrategias de expansión que abarque las necesidades y cumpla con los objetivos de A&S. 
+\
+```{r}
+denue <- read_excel("INEGI_DENUE.xlsx")
+```
+
+### **Limpieza** 
+```{r}
+glimpse(denue)
+```
+
+```{r}
+# Cambio de nombre de las variables
+colnames(denue) <- c("ID", "Clee", "Unidad_Economica", "Razon_Social", "Codigo_Actividad", "NClase_Actividad", "Personal_Ocupado", "TVialidad", "NVialidad", "TVialidad1", "NVialidad1", "TVialidad2", "NVialidad2", "TVialidad3", "NVialidad3", "NExteriorKM", "Letra_Exterior", "Edificio", "Edificio_Piso", "Num_Interior", "Letra_Interior", "Tipo_Asentamiento", "Nombre_Asentamiento", "Tipo_CentroComercial", "Categoría_Centro", "Num_Local", "CP", "CVE_Entidad", "Entidad", "CVE_Municipio", "Municipio", "CVE_Localidad", "Localidad", "Area_Geoestadistica", "Manzana", "Telefono", "Correo", "SitioWeb", "Tipo_Establecimiento", "Latitud", "Longitud", "Fecha_IncorporacionDENUE")
+```
+
+```{r}
+denue  %<>%  dplyr::select(-Clee, -TVialidad1, -NVialidad1, -TVialidad2, -NVialidad2, -TVialidad3, -NVialidad3, -NExteriorKM, -Letra_Exterior, -Edificio_Piso, -Num_Interior, -Letra_Interior, -Num_Local, -CP, -Telefono, -Correo, -SitioWeb, -Fecha_IncorporacionDENUE)
+```
+
+```{r}
+factores <- c("Unidad_Economica","Razon_Social","NClase_Actividad","Personal_Ocupado","TVialidad","Tipo_Asentamiento","Nombre_Asentamiento","Tipo_CentroComercial","Entidad","Municipio","Localidad","Area_Geoestadistica","Tipo_Establecimiento")
+denue[factores] <- lapply(denue[factores], as.factor)
+```
+
+### **Actividades** 
+
+Las actividades más relevantes son:
+
+- Comercio al por mayor de frutas y verduras frescas (29%) 
+- Comercio al por mayor de abarrotes (13%) 
+- Comercio al por mayor de carne de aves (10%) 
+- Comercio al por mayor de carnes rojas (9%) 
+- Comercio al por mayor de semillas y granos alimenticios, especias y chiles secos (6%) 
+
+Las actividades menos relevantes son:
+
+- Comercio al por mayor de cigarros, puros y tabaco (0.44%)
+- Comercio al por mayor de conservas alimenticias (1.18%)
+- Comercio al por mayor de pescados y mariscos (1.40%) 
+- Comercio al por mayor de pan y pasteles (1.48%) 
+- Comercio al por mayor de huevo (1.62%) 
+
+```{r}
+table_nclass <- table(denue$NClase_Actividad)
+percentage <- prop.table(table_nclass) * 100
+sorted_percentage <- sort(percentage, decreasing = TRUE)
+```
+
+### **Top municipios**
+
+Top de municipios por clase de actividad: 
+
+- San Nicolas de los Garza (39%)
+- Monterrey (23%)
+- Guadalupe (10%)
+- Apodaca (6.5%)
+- Santa Catarina (3.7%)
+- General Escobedo (3.3%)
+
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 21.** Municipios con Mayor Actividad'}
+denue %>% count(NClase_Actividad, Municipio) %>% arrange(desc(n)) %>%
+  slice_head(n = 25) %>% #selecciona las primeras 10 filas del dataframe después de ordenarlo por frecuencia descendente
+  ggplot(mapping = aes(x = reorder(Municipio, -n), y = n)) + geom_line(size=1,color="#A6BAF2",fill= "#A6BAF2")+
+  geom_point(size = 3, shape = 21, color = "#7494EA", fill = "#5E83E8") + theme_light() +
+  ggtitle("Top municipios por clase de actividad") + xlab("") +  ylab("") +theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>% count(Municipio) %>%
+  mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>% count(Municipio) %>%
+  mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+#### San Nicolás de los Garza
+
+En san nicolás el top de actividades son las siguientes:
+
+- Comercio al por mayor de frutas y verduras frescas (65%)
+- Comercio al por mayor de semillas y granos alimenticios, especias y chiles secos (7%)
+
+Las actividades menos relevantes son las siguientes:
+
+- Comercio al por mayor de vinos y licores (0.94%)
+- Comercio al por mayor de conservas alimenticias (0.94%)
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>%  filter(Municipio=="San Nicolas de los Garza") %>% 
+  count(NClase_Actividad) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+#### Monterrey
+
+En Monterrey las actividades más relevantes son las siguientes:
+
+- Comercio al por mayor de carnes rojas (14%)
+- Comercio al por mayor de abarrotes (13.3%)
+- Comercio al por mayor de carne de aves (10%)
+
+Las actividades menos relevantes son las siguientes:
+
+- Comercio al por mayor de huevo (1.3%)
+- Comercio al por mayor de cigarros, puros y tabaco (1.6%)
+
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>%  filter(Municipio=="Monterrey") %>%
+  count(NClase_Actividad) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>%arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+#### Guadalupe
+
+En Guadalupe las actividades más relevantes son los siguientes:
+
+- Comercio al por mayor de carnes rojas (20.43%)
+- Comercio al por mayor de carne de aves (17.5%)
+- Comercio al por mayor de abarrotes (16.78%)
+- Comercio al por mayor de dulces y materias primas para reposterÌa (10.2%)
+
+
+Las actividades menos relevantes son las siguientes:
+
+- Comercio al por mayor de conservas alimenticias (0.7%)
+- Comercio al por mayor de huevo (1.4%)
+
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>% filter(Municipio=="Guadalupe") %>% 
+  count(NClase_Actividad) %>%  mutate(Frecuencia = scales::percent( n /sum(n))) %>%  arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+#### Apodaca
+
+En Apodaca las actividades más relevantes son las siguientes:
+
+- Comercio al por mayor de carne de aves (17.9%)
+- Comercio al por mayor de abarrotes (13.4%)
+- Comercio al por mayor de carnes rojas (11.2%)
+- Comercio al por mayor de otros alimentos (11.2%)
+
+Las actividades menos relevantes son las siguientes:
+
+- Comercio al por mayor de vinos y licores	 (1.12%)	
+- Comercio al por mayor de huevo	(1.12%)			
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>%  filter(Municipio=="Apodaca") %>% 
+  count(NClase_Actividad) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+#### Santa Catarina
+En Santa Catarina las actividades más relevantes son las siguientes:
+
+- Comercio al por mayor de abarrotes	(25%)
+- Comercio al por mayor de carne de aves	(15.6%)
+
+Las actividades menos relevantes son las siguientes:
+
+- Comercio al por mayor de semillas y granos alimenticios, especias y chiles secos	(1.9%)
+- Comercio al por mayor de pescados y mariscos	(1.9%)
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>%  filter(Municipio=="Santa Catarina") %>%
+  count(NClase_Actividad) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+#### Escobedo
+En Escobedo las actividades más relevantes son las siguientes:
+
+- Comercio al por mayor de carne de aves	(26.6%)
+- Comercio al por mayor de abarrotes	(13.3%)
+- Comercio al por mayor de bebidas no alcohólicas y hielo	(11.11%)
+
+Las actividades menos relevantes son las siguientes:
+
+- Comercio al por mayor de semillas y granos alimenticios, especias y chiles secos	(2.2%)
+- Comercio al por mayor de embutidos	(2.2%)
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio) %>%  filter(Municipio=="General Escobedo") %>%
+  count(NClase_Actividad) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n)) %>% rmarkdown::paged_table()
+```
+
+
+### **Tipo Centro Comercial**
+El 64.2% de los registros sobre el tipo de centro comercial/establecimiento no tiene algún tipo de clasificación, mientras que el 30.9% es de la Central de abastos.
+\
+```{r fig.align='center'}
+denue %>% select(NClase_Actividad, Municipio, Tipo_CentroComercial)%>% 
+  count(Tipo_CentroComercial) %>% mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+### **Competidores**
+Por último, los principales comercios que tienen actividad de comercio al por mayor en la industria de abarrotes, alimentos, bebidas, hielo y tabaco no tienen como tal una clasificación con el 32% siendo la clasificación con mayor porcentaje y por consiguiente con un 4.07% **AVIPECUARIA MARLAN SA DE CV** dedicada al comercio al por mayor de carne de aves.
+\
+```{r fig.align='center'}
+denue %>%select(Razon_Social) %>% count(Razon_Social) %>%
+  mutate(Frecuencia = scales::percent( n /sum(n))) %>% arrange(desc(n))  %>% rmarkdown::paged_table()
+```
+
+
+### **Insights**
+Despues de realizar el análisis exploratorio, encontramos los siguientes insights:
+
+**Insights DENUE:**
+
+* El 29% del comercio al por mayor de abarrotes, alimentos, bebidas, hielo y tabaco en Nuevo León corresponde a la actividad de “Comercio al por mayor de frutas y verduras frescas”, mientras que el 13% corresponde a “Comercio al por mayor de abarrotes”.
+* Los municipios de Nuevo León más relevantes en la industria de comercio al por mayor son: San Nicolás de los Garza (39.23%), Monterrey (22.72%) y Guadalupe (10.14%).
+* El 31% de las actividades de comercio al por mayor en Nuevo León le corresponde a la central de abastos, mientras que el 64% no tiene una clasificación como tal.
+“Avipecuaria MARLAN SA de CV” es la unidad económica que corresponde el 31.9% de la actividad de comercio al por mayor.
+
+**Insights Nuevo León:**
+
+* De acuerdo al informe “Coyuntura Económico” de Nuevo León al tercer trimestre de 2021: El Índice de Nacional de Precios al Consumidor (INPC) alcanzó un incremento del 6.0% en México, para Monterrey fue de 5.7%. 
+* Los sectores con mayor incremento en precios son el de “alimentos y bebidas” (8.1%) y “transporte” (7%), mientras que el sector de menor alza fue el de “educación y esparcimiento” (3.0%).
+* Nuevo León cuenta con 151 mil unidades económicas que representan el 3.1% de las empresas del país, de acuerdo al Censo Económico de 2019.
+* De acuerdo a la “Presentación de Resultados ENIGH 2020”, el gasto corriente monetario total trimestral estimado en la ENIGH 2020 de Nuevo León fue de 62.6 millones de pesos y el 32.3% corresponde al sector de “alimentos y bebidas”.
+
+# **Análitica predictiva** 
+Después de nuestro análisis descriptivo, proseguimos al análisis predictivo donde desarrollamos modelos de Regresión Lineal, Random Forest y Support Vector Machine tomando como variable a predecir las ventas de A&S. Para la selección de variables de interés realizamos una matriz de correlación y realizamos un modelo de regresión lineal con parámetros de selección de AIC. 
+
+## *Modelo Market Basket* {.tabset}
+Desarrollamos el modelo market basket para identificar  patrones y asociaciones entre los productos del catálogo. Como resultado, este modelo nos dio información valiosa sobre los pedidos recurrentes de los clientes
+
+### MB para la recurrencia
+Para detectar órdenes recurrentes, hicimos un análisis tipo market basket para las 30 mil órdenes con los 102 productos.
+\
+```{r}
+market_basket <- pivot_wider(base,
+  id_cols = c(id_pedido,id_cliente),
+  names_from = nombre,values_from = id_producto, values_fn = length, values_fill = 0)
+cantidades_mb <- market_basket
+group_cols <- c(3:104)
+market_basket[group_cols] <- lapply(market_basket[group_cols], as.factor)
+market_basket %<>% mutate_if(is.factor, function(x) as.factor(ifelse(x != "0", "1", "0")))
+```
+
+Solo hay 26 clientes que han hecho un total de 36 órdenes repetidas. El cliente que más las ha hecho es RESTAURANTE BONDIA, con 5 órdenes recurrentes. En total, las órdenes recurrentes representan el 0.0012% del total de todas las órdenes.
+\
+```{r}
+group_cols <- c(2:104)
+market_basket %>%
+  group_by(across(group_cols)) %>%
+  count() %>% filter(n > 1) %>% ungroup() %>%
+  count(id_cliente,sort=T) %>%   mutate(Frecuencia = scales::percent( n /30000)) %>% rmarkdown::paged_table() 
+```
+
+### MB frecuencia de productos
+Ahora, analizando las órdenes, ¿cuáles son los productos más ordenados? ¿Cuántas unidades se piden por orden? ¿ Cuánto generan en ingresos?
+\
+```{r}
+recurrencia_prod <- cantidades_mb %>% dplyr::select(-id_pedido,-id_cliente)
+recurrencia_prod %<>% mutate_if(is.numeric, function(x) as.numeric(ifelse(x == 0, 0, 1)))
+recurrencia_prod <- colSums(recurrencia_prod)
+recurrencia_prod <- data.frame(Producto = names(recurrencia_prod), Presencia_en_Ticket = recurrencia_prod)
+```
+
+```{r}
+cantidades <- cantidades_mb %>% dplyr::select(-id_pedido,-id_cliente)
+cantidades <- colSums(cantidades)
+product_counts_df <- data.frame(Producto = names(cantidades), Cantidad_Total = cantidades)
+```
+
+Los 10 principales productos en términos de recurrencia, cantidad de pedidos y ventas son: Salmón, pastel, lomo, jalapeño, deshebrada, panela, philadelphia, diezmillo, bacon y mostaza. Con esta información, se pudo desarrollar estrategias para impulsar estos productos y seleccionar prospectos con los cuales promocionarlos en el catálogo.
+\
+```{r}
+mb<- merge(recurrencia_prod,product_counts_df, by.x = "Producto",by.y = "Producto",all=T)
+precios <- base %>% dplyr::select(nombre,precio_unidad) %>% distinct()
+mb<- merge(mb,precios, by.x = "Producto",by.y = "nombre",all=T)
+mb%>% mutate(Ganancia = precio_unidad*Cantidad_Total) %>% arrange(desc(Ganancia))  %>% rmarkdown::paged_table()
+```
+
+## *Modelo de Regresiones* {.tabset}
+Para hacer la regresión, es necesario transformar los datos de manera que la predicción sea del total del ticket. Se hará una transformación similar a la market basket, pero con cartegoría y familia en vez de productos.
+\
+```{r}
+datos_regresion <- tidyr::pivot_wider(base,
+  id_cols = c(ventas_pedido,id_pedido,id_cliente,tiempo,fechapedido,cancelado,per_ocu,municipio,actividad,cantidad_pedido,Tipo,cve_mun),
+  names_from = Categoria_Familia,values_from = Categoria_Familia, values_fn = length, values_fill = 0)
+datos_regresion$municipio <- as.factor(datos_regresion$municipio)
+```
+
+### Transformación
+Como podemos ver, no es necesario transformar la variable dependiente.
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 15.** Distribución de Ventas por Pedido'}
+options(scipen = 999)
+ggplot(datos_regresion,aes(ventas_pedido)) + geom_histogram(color="#5E9FD4",fill="#7EB2DD") +theme_light() + labs(title="Distribución de las Ventas")  +xlab("")+ylab("") + scale_x_continuous(labels = scales::comma) +theme(plot.title = element_text(hjust = 0.5))
+```
+
+Convertiremos las 2 variables de factor con múltiples niveles (per_ocu y municipio) a columnas binarias para una mejor precisión en el modelo.
+\
+```{r}
+datos_regresion %<>% mutate(per_ocu_0a5 = as.factor(ifelse(per_ocu=="0 a 5 personas",1,0)),
+                            per_ocu_6a10 = as.factor(ifelse(per_ocu=="6 a 10 personas",1,0)),
+                            per_ocu_11a30 = as.factor(ifelse(per_ocu=="11 a 30 personas",1,0)),
+                            per_ocu_31a50 = as.factor(ifelse(per_ocu=="31 a 50 personas",1,0)),
+                            per_ocu_101a250 = as.factor(ifelse(per_ocu=="101 a 250 personas",1,0))) %>% select(-per_ocu)
+```
+
+```{r}
+datos_regresion %<>% mutate(Apodaca=as.factor(ifelse(municipio=="Apodaca",1,0)),
+                            Escobedo=as.factor(ifelse(municipio=="General Escobedo",1,0)),
+                            Guadalupe=as.factor(ifelse(municipio=="Guadalupe",1,0)),
+                            Monterrey=as.factor(ifelse(municipio=="Monterrey",1,0)),
+                            SalinasV=as.factor(ifelse(municipio=="Salinas Victoria",1,0)),
+                            San_Nicolas=as.factor(ifelse(municipio=="San Nicolás de los Garza",1,0)),
+                            San_Pedro=as.factor(ifelse(municipio=="San Pedro Garza García",1,0)),
+                            Santa_Catarina=as.factor(ifelse(municipio=="Santa Catarina",1,0)),
+                            Santiago=as.factor(ifelse(municipio=="Santiago",1,0))) %>% select(-municipio)
+```
+
+### Fuentes secundarias
+Usaremos datos de DENUE de previas actividades para complementar la base de datos.
+\
+```{r}
+datos_nuevos <- readxl::read_xlsx("nuevo_leon.xlsx")
+datos_nuevos %<>%mutate(cve_mun = ifelse(nchar(cve_mun)==2,paste0("0",cve_mun),
+                                          ifelse(nchar(cve_mun)==1,paste0("00",cve_mun),cve_mun)))
+```
+
+```{r}
+datos_nuevos <-  merge(datos_regresion,datos_nuevos, by.x="cve_mun", by.y="cve_mun",all.x=TRUE) 
+```
+
+### Selección de variables
+
+#### Por Correlación
+Haciendo una matríz de correlación con los datos transformados y los datos de fuente secundarias, tenemos 2 principales hallazgos. Las variables que más afectan las ventas de un peddio son la categorías de los productos en una orden. En segundo lugar, podemos observar que, como era esperado existen altos niveles de correlación entre las variables independientes. Esto afectará de manera negativa el modelo.
+\
+```{r}
+cor <- datos_nuevos %>% select(-cve_mun,-id_pedido,-id_cliente,-cantidad_pedido)
+cor <- model.matrix(~0+., data=cor) 
+cor <- round(cor(cor),4)
+corrplot::corrplot(cor,method = 'color', order = 'original',
+         tl.srt=90,tl.col="black",cl.pos = 'b', addgrid.col = 'white', tl.cex = 0.55)
+```
+
+#### Por AIC y LM
+Como la correlación no fue muy útil para la selección de variables usaremos una regresión lineal con selección de variables según el AIC más bajo.
+\
+```{r}
+set.seed(123123)
+split = caTools::sample.split(datos_nuevos$ventas_pedido, SplitRatio = 0.8)
+train_set = subset(datos_nuevos, split == F) 
+test_set = subset(datos_nuevos, split == T)
+rm(split)
+```
+
+```{r}
+# El modelo que selecciona usa las categorías de alimento, la cantidad de unidades en el pedido y 3 categorías de per_ocu
+set.seed(123)
+lm <- lm(ventas_pedido~., train_set) %>%  MASS::stepAIC(trace = F)
+summary(lm)
+```
+
+```{r}
+# Para hacer uso de los datos externos, incluiremos la población del 2022 y el porcentaje de pobreza extrema.
+modelo <- ventas_pedido ~ cantidad_pedido + normal_preparado + 
+    congelado_animal + normal_queso + normal_sazón + normal_vegetal + 
+    normal_liquido + congelado_preparado + normal_animal + per_ocu_0a5 + 
+    per_ocu_6a10 + per_ocu_11a30 +poblacion_2022 + porcentaje_pob_pobreza_ext
+```
+
+### Modelos
+
+#### Support Vector Machine
+\
+```{r}
+set.seed(123)
+svm <- e1071::svm(modelo, train_set,type = 'eps-regression',kernel = 'radial')
+summary(svm)
+```
+
+#### Random Forest
+\
+```{r}
+set.seed(1234)
+rf = randomForest::randomForest(modelo,data=train_set, ntree = 500, importance = TRUE)
+rf
+```
+
+#### Selección del Modelo
+\
+Usaremos el RMSE para la selección del modelo. Comparando el SVM, el RF y el LM que se usó para la selección de las variables, el LM es el modelo con un menor RMSE. Es importante volver a mencionar que los datos están correlacionados, por lo que sería una buena opción explorar otros métodos de predicción para así tener un modelo más preciso.
+\
+```{r}
+lmpred = predict(lm, newdata = test_set)
+lmp <- Metrics::rmse(test_set$ventas_pedido, lmpred)
+svmpred = predict(svm, newdata = test_set)
+svmp <- Metrics::rmse(test_set$ventas_pedido, svmpred)
+rfpred = predict(rf, newdata = test_set)
+rfp <- Metrics::rmse(test_set$ventas_pedido, rfpred)
+(comp <- data.frame(Modelo=c("LM","SVM","RF"),RMSE=c(lmp,svmp,rfp)) %>% rmarkdown::paged_table())
+```
+
+
+## *Modelo de Serie de Tiempo* 
+Para el escenario a tres años de las ventas, se transformaron los datos a una serie de tiempo trimestral esto se hizo sumando el total de las 30,000 órdenes a lo largo del tiempo. Empezando con el T1 del 2020 y terminando con el T1 del 2023. Después de esto se hizo una prueba de estacionariedad y se encontró que los datos no son estacionarios. Para la proyección se usó un modelo ARIMA y a continuación podemos observar los datos históricos y la predicción. 
+
+#### Transformación de Datos
+Sumaremos las ventas para hacer una serie de tiempo a nivel trimestre.
+\
+```{r}
+st <- datos_regresion %>% 
+  mutate(Q =lubridate::date(zoo::as.yearqtr(fechapedido, format = "%Y-%Q"))) %>% 
+  select(Q,ventas_pedido) %>%
+  group_by(Q) %>% summarise(Ventas = sum(ventas_pedido)) %>% ungroup() %>% mutate(Tipo = as.factor("Histórico"))
+ventas_st<-ts(data=st$Ventas,frequency=4,start=c(2020,1),end=c(2023,1))
+```
+
+#### Estacionalidad
+```{r}
+#Revisando la estacionalidad, podemos ver que el  p-value es mayor a 0.05 por lo que los datos no son estacionarios
+adf.test(st$Ventas) 
+```
+
+#### Modelo
+```{r}
+# Modelo auto arima.
+modelo<-auto.arima(ventas_st,d=1)
+```
+
+##### Pronóstico
+```{r}
+# Haremos un prónostico de los datos a 3 años, por lo que se predicirán 12 periodos.
+forecast1 <- forecast(modelo, h = 12)
+```
+\
+```{r}
+# Se hará un gráfico de escenarios optimistas y pesimistas con intervalos de confianza del 80% y 95%.
+start_date <- lubridate::yq("2023 Q2")
+end_date <- lubridate::yq("2026 Q1")
+forecast <- as.data.frame(forecast1)
+Q <- seq(lubridate::yq("2023 Q2"), lubridate::yq("2026 Q1"), by = "3 months")
+lo80 <- forecast %>% select(`Lo 80`) %>%  mutate(Tipo = as.factor("Pronóstico")) %>% rename(Ventas = `Lo 80`) 
+hi80 <- forecast %>%select(`Hi 80`) %>%  mutate(Tipo = as.factor("Pronóstico")) %>% rename(Ventas = `Hi 80`) 
+lo95 <- forecast %>%select(`Lo 95`) %>%  mutate(Tipo = as.factor("Pronóstico")) %>% rename(Ventas = `Lo 95`) 
+hi95 <- forecast %>%select(`Hi 95`) %>%  mutate(Tipo = as.factor("Pronóstico")) %>% rename(Ventas = `Hi 95`) 
+
+lo80 <- cbind(Q,lo80) 
+hi80 <- cbind(Q,hi80)
+lo95 <- cbind(Q,lo95)
+hi95 <- cbind(Q,hi95)
+
+lo80 <- rbind(st,lo80) 
+hi80 <- rbind(st,hi80)
+lo95 <- rbind(st,lo95)
+hi95 <- rbind(st,hi95)
+
+```
+
+Es importante resaltar que está serie de tiempo es un resumen de los datos creado por nosotras y que no toma en cuenta cualquier otro dato, por lo que la predicción no es la más precisa. Esto se evidencia en los 4 posibles escenarios. Usando intervalos de confianza del 80% y 95% para escenarios pesimistas y optimistas, vemos que los pronósticos son o muy altos o muy bajos, según el escenario. 
+\
+```{r fig.align='center', warning=FALSE, out.width='85%',fig.cap='**Gráfico 16-19.** Escenarios de Predicción'}
+l8 <- ggplot(lo80,aes(x=Q,y=Ventas,color=Tipo)) + geom_line(size=0.8) +  geom_point(size=1.2)+ theme_light() + theme(legend.position = "",plot.title = element_text(hjust = 0.5))+
+  scale_y_continuous(labels = scales::comma)  +  ggtitle("80 Pesimista")  +xlab("")+ylab("") + scale_color_manual(values = colores)  
+ 
+  
+h8 <- ggplot(hi80,aes(x=Q,y=Ventas,color=Tipo))  + geom_line(size=0.8) +  geom_point(size=1.2)+ theme_light() + theme(legend.position = "",plot.title = element_text(hjust = 0.5))+ scale_y_continuous(labels = scales::comma)  +
+  ggtitle("80 Optimista")  +xlab("")+ylab("") + scale_color_manual(values = colores)  
+ 
+l9 <- ggplot(lo95,aes(x=Q,y=Ventas,color=Tipo))  + geom_line(size=0.8) +  geom_point(size=1.2)+ theme_light() + theme(legend.position = "",plot.title = element_text(hjust = 0.5))+scale_y_continuous(labels = scales::comma)  +
+  ggtitle("95 Pesimista")  +xlab("")+ylab("") + scale_color_manual(values = colores)  
+ 
+h9 <- ggplot(hi95,aes(x=Q,y=Ventas,color=Tipo))+ geom_line(size=0.8) +  geom_point(size=1.2)+ theme_light() + theme(legend.position = "",plot.title = element_text(hjust = 0.5))+ scale_y_continuous(labels = scales::comma)  +
+  ggtitle("95 Optimista")  +xlab("")+ylab("") + scale_color_manual(values = colores)  
+ 
+cowplot::plot_grid(l8,l9,h8,h9)
+```
+\
+Por otro lado, aquí podemos observar el promedio de los pronósticos, osea el promedio de todos los escenarios mostrados anteriormente en uno, el cual demuestra una tendencia estable en la predicción de ventas.
+```{r fig.align='center', out.width='85%',fig.cap='**Gráfico 20.** Escenarios de Predicción'}
+# Aquí podemos ver esto resumido con el promedio de los pronósticos, el cual es el mismo número para cada valor pronosticado. 
+options(scipen = 999)
+plot(forecast1,main="Promedio de Escenarios")
+```
+
+## *Insights*
+Despues de realizar los modelos predictivos, encontramos los siguientes insights:
+
+* Del modelo market basket encontramos que solo hay 26 clientes que han realizado un total de 36 órdenes repetidas. El cliente con más órdenes recurrentes fue “Restaurante Bondia”, con 5 órdenes repetidas. En total, las órdenes recurrentes representan solo el 0.0012% del total de todas las órdenes.
+
+* Con el market basket identificamos los productos más solicitados, la cantidad de unidades por pedido y los ingresos generados por ellos. A partir de estos resultados, se identificaron los 10 principales productos en términos de recurrencia, cantidad de pedidos y ventas. Estos productos son: Salmón, pastel, lomo, jalapeño, deshebrada, panela, philadelphia, diezmillo, bacon y mostaza. Con esta información, se desarrollo la estrategias para impulsar estos productos y seleccionar prospectos con los cuales promocionarlos en el catálogo.
+
+* De los modelos de regresión, a pesar de que estos no son precisos, sus resultados indican que manteniendo la empresa como está actualmente, las ventas se mantendrán estables en los próximos 3 años. Combinando este inisght con las áreas de oportunidad que presenta el mercado, consideramos que la expansión, en base a la propuesta de clientes prospectos, representa una gran oportunidad de crecimiento del negocio dentro del periodo de tres años. 
+
+
+# **Análitica prescriptiva** 
+Por ultimo, considerando los resultados e insights encontrados en el análisis descriptivo y predictivo para funtes internas y externas relizamos un analisis FODA para identificar cuales son esos factores de relevancia para la creación de nuestra estrategia. 
+
+## *FODA* 
+
+### Interno 
+#### *Fortalezas identificadas:*
+
+* Cuenta con un portafolio de clientes activos bastante recurrentes. 
+* Los clientes actuales son diversos y poseen experiencia en la industria de alimentos.
+* Las ventas y ganancias se han mantenido estables a lo largo de los años.
+* Tienen un catálogo de productos bastante fuerte en tema de rentabilidad y flexible ya que son productos que pueden atender a varios tipos de negocios y comercios.  
+* La capacidad logística permite la entrega rápida en cualquiera de los 13 municipios de la zona metropolitana de Monterrey con entregas rápidas de 1 a 2 días. 
+
+#### *Debilidades identificadas:*
+
+* Falta de seguimiento y control de los clientes pasivos, lo que impide aprovechar oportunidades de negocio.
+* Ausencia de seguimiento de las órdenes canceladas, lo que representa pérdidas financieras de millones de pesos significativas.
+
+#### *Resumen:* 
+Con las fortalezas y debilidades identificadas, podemos concluir que la empresa Alimento y Snack Monterrey cuenta con una base sólida de clientes recurrentes, un catálogo de productos rentable y una capacidad logística para atender una amplia zona geográfica. Sin embargo, es necesario abordar las debilidades relacionadas con el seguimiento de clientes pasivos y las órdenes canceladas para mejorar el desempeño y aprovechar todo el potencial de crecimiento en el mercado. 
+
+### Externo 
+
+#### *Oportunidades identificadas: *
+
+* Los municipios de San Nicolás de los Garza, Monterrey y Guadalupe presentan una gran oportunidad de expansión debido a su destacada participación en la industria de comercio al por mayor. 
+* El 32.3% del gasto corriente trimestral en Nuevo León se dirige al sector de alimentos y bebidas, lo que indica una sólida demanda en esta área. Esta situación crea una excelente oportunidad de crecimiento para expandir la cartera de clientes de A&S.
+* Con el 31% de las actividades de comercio al por mayor en Nuevo León relacionadas con la central de abastos, existen oportunidades de establecer relaciones comerciales sólidas en este mercado con el fin de fortalecer su presencia en la cadena de suministro. 
+
+#### *Amenazas identificadas:*
+
+* El incremento de los precios en el sector de alimentos y bebidas puede hacer que los costos de producción y distribución aumenten, el cual podría afectar la rentabilidad y competitividad de la empresa
+* La presencia de muchas empresas dentro del comercio al por mayor en Nuevo León, presenta un desafío para la empresa A&S al buscar expandir su cartera de clientes y adquirir una cuota de mercado significativa debido a la competencia actual. En otras palabras, hay fuerte competencia en el mercado por competidores con mayor participación, por ejemplo, HB Alimentos con una participación del 7% y Sigma Alimentos con una participación del 70% en Monterrey, Nuevo León.
+
+#### *Resumen:* 
+A partir de las oportunidades y amenazas identificadas, concluimos que A&S puede aprovechar las oportunidades para expandir su cartera de clientes y diversificar su oferta de productos. Sin embargo, es crucial que esté alerta ante las amenazas, como el aumento de los precios y la competencia, y tome medidas estratégicas para mitigar los posibles impactos negativos.
+
+## *Selección de prospectos* {.tabset}
+Como se estableció en un principio, uno de los objetivos principales de este caso es proporcionar estrategias para la expansión del negocio de Alimentos y Snack Monterrey. 
+
+```{r}
+prospectos <- read_csv("prospectos.csv")
+```
+
+Estos son los datos disponibles de los clientes prospectos: 
+
+- **lat y long**: latitdud y longitud
+- **nombre_act, nom_estab y raz_social**: Nombre del negocio, su actividad y su razón social
+- **per_ocu**: La ocupación de cada cliente
+- **tipo_vial, nom_vial**: Información de la ubicación (tipo de calle y nombre de la calle)
+- **edificio, edificio_e**: Información de la ubicación
+- **tipo_asent, nomb_Asent**: Información de la ubicación
+- **tipoCenCom, nom_CenCom, num_local**: Información de la ubicación si está en un centro comercial
+- **cod_postal,cve_ent,entidad**: Información de la ubicación, estado en el que está
+- **cve_mun,municipio**: Muncipio en el que está
+- **cve_loc,localidad, ageb, AGEB_int, manzana**: Información de la ubicación
+- **fecha_alta**: fecha de alta del negocio 
+
+### Limpieza y tranformación 
+```{r}
+# Eliminación de variables no relevantes y con NAs
+prospectos %<>% select(-raz_social,-edificio,-edificio_e,-tipoCenCom,-nom_CenCom,
+                       -num_local,-tipo_vial,-nom_vial,-nomb_asent)
+```
+
+```{r}
+# FACTORES
+factores <- c("entidad","municipio","localidad","nombre_act","per_ocu","tipoUniEco")
+prospectos[factores] <- lapply(prospectos[factores], as.factor)
+# FECHAS
+prospectos %<>% dplyr::mutate(año_alta = as.factor(substr(prospectos$fecha_alta, 0, 4)),
+                              mes_alta = as.factor(substr(prospectos$fecha_alta, 6, 7)))
+```
+
+### Feature engineering
+
+##### Tamaño de la empresa
+```{r fig.align='center'}
+prospectos %<>% 
+  mutate(tamaño = forcats::fct_collapse(prospectos$per_ocu,
+                                             "Micro" =  c("0 a 5 personas"),
+                                            "Pequeña" =  c("6 a 10 personas","11 a 30 personas" ),
+                                            "Mediana" =  c("31 a 50 personas","51 a 100 personas"),
+                                            "Grande" =  c("101 a 250 personas","251 y más personas")))
+table(prospectos$tamaño,prospectos$per_ocu)
+```
+
+##### Nombre de la actividad por negocio 
+```{r}
+prospectos %<>% 
+  mutate(actividad_original = nombre_act)
+
+# ARREGLAMOS EL NOMBRE DE LAS ACTIVIDADES ACTIVIDADES DE LOS CLIENTES 
+prospectos %<>% 
+  mutate(nombre_act = forcats::fct_collapse(prospectos$actividad_original,
+                                             "Alojamientos" =  c("Cabañas, villas y similares","Campamentos y albergues recreativos","Departamentos y casas amueblados con servicios de hotelería","Hoteles con otros servicios integrados","Hoteles sin otros servicios integrados","Moteles","Pensiones y casas de huéspedes"),
+                                             "Cafeterías" = c("Cafeterías, fuentes de sodas, neverías, refresquerías y similares","CafeterÌas, fuentes de sodas, neverÌas, refresquerÌas y similares"),
+                                             "Centros nocturnos" = c("Centros nocturnos, discotecas y similares","Bares, cantinas y similares"),
+                                             "Restaurantes a la carta" = c("Restaurantes con servicio de preparación de alimentos a la carta o de comida corrida"),
+                                             "Restaurantes de antojitos" =  c("Restaurantes con servicio de preparación de antojitos","Restaurantes con servicio de preparaciÛn de antojitos"),
+                                             "Restaurantes de pescados y mariscos" = c("Restaurantes con servicio de preparación de pescados y mariscos","Restaurantes con servicio de preparaciÛn de pescados y mariscos"),
+                                             "Restaurantes de comida rapida" = c("Restaurantes con servicio de preparación de pizzas, hamburguesas, hot dogs y pollos rostizados para llevar","Restaurantes con servicio de preparaciÛn de pizzas, hamburguesas, hot dogs y pollos rostizados para llevar"),
+                                             "Restaurantes de tacos y tortas" = c("Restaurantes con servicio de preparación de tacos y tortas","Restaurantes con servicio de preparaciÛn de tacos y tortas"),
+                                             "Restaurantes de autoservicio" = c("Restaurantes de autoservicio"),
+                                             "Restaurantes para llevar" = c("Restaurantes que preparan otro tipo de alimentos para llevar"),
+                                             "Servicios de comedor para empresas" = c("Servicios de comedor para empresas e instituciones"),
+                                             "Servicios de preparación de alimentos" = c("Servicios de preparación de alimentos en unidades móviles","Servicios de preparación de alimentos para ocasiones especiales","Servicios de preparación de otros alimentos para consumo inmediato","Servicios de preparaciÛn de otros alimentos para consumo inmediato"),))
+table(prospectos$nombre_act)
+```
+
+##### Agrupación por Negocio 
+```{r}
+prospectos %<>% mutate(actividad = forcats::fct_collapse(prospectos$nombre_act,
+                                             "Restaurantes" =  c("Restaurantes de antojitos","Restaurantes de comida rapida","Restaurantes de autoservicio","Restaurantes a la carta","Restaurantes de pescados y mariscos","Restaurantes de tacos y tortas","Restaurantes para llevar"),
+                                             "Alojamientos" = c("Alojamientos"),
+                                             "Servicios" = c("Servicios de preparación de alimentos","Servicios de comedor para empresas"),
+                                             "Centros nocturnos" = c("Centros nocturnos"),
+                                             "Cafeterías" =  c("Cafeterías")))  
+table(prospectos$actividad)
+# Tenemos 5 actividades: Restaurantes -  Cafeterías - Servicios - Centros nocturnos - Alojamientos
+# De estas 5 el portafolio de clientes solo se centra en restuantes y alojamiento
+```
+
+### Consultas 
+```{r}
+skimr::skim(prospectos)
+```
+
+#### *Cantidad de prospectos por actividad*
+```{r fig.align='center'}
+sqldf('SELECT actividad, COUNT(actividad) AS n
+      FROM prospectos
+      GROUP BY actividad
+      ORDER BY n DESC')
+```
+#### *Tipo de establecimeientos por actividad *
+```{r fig.align='center'}
+sqldf('SELECT nombre_act, actividad, COUNT(nombre_act) AS n
+      FROM prospectos
+      GROUP BY nombre_act, actividad
+      ORDER BY n DESC')
+```
+#### *Ver que alojamientos escoger*
+```{r fig.align='center'}
+sqldf('SELECT actividad_original, actividad, COUNT(actividad) AS n
+      FROM prospectos
+      WHERE actividad = "Alojamientos"
+      GROUP BY actividad_original, actividad
+      ORDER BY n DESC')
+```
+#### *Ver que restarurante escogemos*
+```{r fig.align='center'}
+sqldf('SELECT nombre_act, actividad, COUNT(actividad) AS n
+      FROM prospectos
+      WHERE actividad = "Restaurantes"
+      GROUP BY nombre_act, actividad
+      ORDER BY n DESC')
+```
+
+### Selección de prospectos 
+Tomando el análisis FODA realizado y los insights hallados determinamos cuáles son los factores o variables claves para determinar cuales son nuestro enfoque de clientes prospectos. Actualmente ellos tienen en la mira 10 mil prospectos distribuidos en diferentes zonas. Consideramos que la cantidad de prospectos que tienen es bastante significativa, por lo tanto, consideramos esencial realizar una limpieza de los mismos para identificar nuestro mercado meta de expansión.
+
+Para realizar este proceso, utilizaremos el método de eliminación donde estaremos filtrando los prospectos en función de las necesidades, la experiencia y nuestro análisis FODA de la empresa A&S. Dentro de los aspectos a considerar nos enfocaremos en dos aspectos clave: ubicación geográfica y características demográficas de los negocios prospectos.  
+
+#### *Por ubicación* 
+* Ubicados en el estado de Nuevo León: Durante nuestros análisis exploratorio encontramos que sus prospectos se encuentran en Nuevo León y el Estado de México. Para poder concentrar el mercado nos enfocaremos solo en Nuevo León. 
+```{r}
+elegidos <- prospectos %>% filter(entidad != "EDOMEX") # 9960 Obs
+```
+
+* Ubicados en el municipio de Monterrey: En nuestro análisis de oportunidades encontramos que los municipios de San Nicolás, Monterrey y Guadalupe presentan una gran oportunidad de expansión debido a su destacada participación en la industria de comercio al por mayor. Sin embargo, para temas de expansión queremos crecer de adentro hacia afuera por lo que comenzaremos enfocándonos en los prospectos de Monterrey. 
+```{r}
+elegidos %<>% filter( municipio == "Monterrey" ) # 3157 Obs
+```
+
+* Ubicados cerca de la CEDIS central: Nuestro enfoque en la centricidad con respecto a la CEDIS permite tener más cercanía con los clientes y llevar un mejor seguimiento de lo mismo. Así dando una oportunidad de mejora a su debilidad de inadecuado seguimiento de sus clientes. 
+```{r}
+# Queremos que todos los prospectos esten cerca de la CEDIS ubicada en el centro de MTY
+# coordenadas del negocio son: 25.680189, -100.306491
+```
+
+#### *Por negocio* 
+Estos filtros demográficos fueron seleccionados tomando en cuenta el comportamientos de los clientes activos, el tipo y giro de negocios de los mismos y la experiencia que tiene A&S trabajando con estos clientes dentro de la industria.  
+
+Prospectos que sean restaurantes y alojamientos: 
+```{r}
+elegidos %<>% filter(actividad == "Restaurantes" | actividad == "Alojamientos" ) # 2413 Obs
+```
+
+* Dado al gran número de pedidos recurrentes y los ingresos significativos que representan, así como el potencial de crecimiento, experiencia colaborando con clientes del sector de restaurantes y nuestra identificación de los productos más rentables y populares dentro del catálogo actual, decidimos enfocarnos en los restaurantes que ofrecen servicio a la carta y especialidades de tacos y tortas.
+
+* En el caso de los alojamientos, nos enfocaremos en los prospectos de hoteles con otros servicios integrados y departamentos, casas amuebladas con servicios de hotelería debido a la oportunidad que esta representa en términos de variabilidad, expansión, y potencializador del catálogo actual dado a los servicios que ofrecen negocios de alojamiento. 
+```{r}
+elegidos %<>% filter(actividad_original == "Hoteles con otros servicios integrados" | 
+                     actividad_original == "Departamentos y casas amueblados con servicios de hotelería" |
+                     nombre_act == "Restaurantes de tacos y tortas" | nombre_act == "Restaurantes a la carta" ) # 1376 Obs
+```
+
+Prospectos de comercios  pequeños y medianos:
+
+* Empresas de 6 a 11 personas: Estas son empresas pequeñas que tienden a tener necesidades específicas de demanda de alimentos por su personal reducido.  
+* Empresas de 11 a 30 personas: Dado a los negocios que nos enfocaremos este tamaño de empresas son ideales para proveer servicios más especializados y potencializar el catálogo actual. 
+* Empresas de 51 a 100 personas: Estas medianas empresas generalmente tienen una demanda constante de alimentos el cual podemos aprovechar como área de oportunidad y establecer contratos a largo plazo. 
+```{r}
+elegidos %<>% filter(per_ocu == "6 a 11 personas" |per_ocu == "11 a 30 personas" | per_ocu == "51 a 100 personas") # 141 Obs
+```
+
+Prospectos que hayan sido dados de alta desde el año 2015 en adelante: Para asegurar que sean empresas existentes y que igual muestren experiencia y madurez en la industria establecimos el criterio que sean empresas con fechas de altas del 2015 en adelante. 
+```{r}
+elegidos %<>% filter(año_alta%in%c("2016","2017","2018","2019","2020","2021","2022")) # 57 Obs
+```
+
+Aplicando todos estos filtros para la selección de prospectos pudimos reducir la lista a 57 clientes prospectos. Con esta selección de clientes buscamos expandir el negocio, duplicando el portafolio de clientes, hacia un mercado más selecto y con un seguro crecimiento con base al análisis tanto interno como externo realizado para A&S dentro de los 3 años planteados.  
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+gmaps_key<-'AIzaSyDBnp7Xch3LGWkWemStA20VlUCLGs7_7oQ'
+register_google(key = gmaps_key) 
+prospectos_elegidos<- elegidos %>%select(lat,long,actividad,per_ocu)
+lat <- as.list(prospectos_elegidos$lat)
+long <- as.list(prospectos_elegidos$long)
+```
+
+```{r echo=FALSE}
+mapa_markers <- leaflet(data = prospectos_elegidos) %>% addTiles()  %>%  addMarkers(lng=~long, lat=~lat)
+mapa_markers
+```
+
+# **Propuesta de estrategia**
+Con base en todo el proceso de análisis realizado previamente, creamos nuestra estrategia para **ganar cuota de mercado**. Esta estrategia tiene el objetivo de aumentar la participación en el mercado en la que opera A&S al desarrollar tácticas, basadas en los datos e insights encontrados, para captar nuevos clientes, aumentar ventas y superar la competencia. 
+
+![](Estrategia.jpg)
+Nuestra estrategia se enfoca en tres aspectos principales: mantener clientes activos, potenciar el catálogo actual y adquirir nuevos clientes. 
+
+Para nuestro primer enfoque vamos a mantener a los clientes activos actuales ya que estos representan un factor crítico de éxito para la empresa. Todos los clientes activos actuales demuestran ser altamente rentables y recurrentes, por lo tanto, es esencial fidelizar a estos clientes mediante el ofrecimiento de una excepcional experiencia al cliente. Esto implica dar un debido seguimiento a las necesidades, brindar un servicio amigable y eficiente y tener la capacidad de personalizar los pedidos según las preferencias y  necesidades. 
+
+Para nuestro segundo enfoque buscamos potenciar el catálogo actual, considerando dos factores clave: la recurrencia y las ganancias. Al determinar cuales son nuestros productos más destacados, hemos identificado cuáles son las vías para potenciar el catálogo. Esto implica la identificación y adquisición de clientes nuevos que ordenen los productos más populares según su segmento, así como la creación de nuevas estrategias de venta a través de promociones de productos más y menos demanda.
+
+Por último, el tercer enfoque se centra en la adquisición de nuevos clientes considerando el objetivo principal de A&S que es la expansión. Basándonos en los insights del análisis FODA, determinamos cuales son las variables esenciales para la elección de nuestros clientes prospectos. Con base a los criterios desarrollados, hemos identificamos 57 clientes prospectos el cual permitirá a A&S duplicar su portafolio de clientes, aumentar su cuota de mercado y destacarse ante la competencia. Con esta estrategia integral, confiamos en que A&S logrará fortalecer su posición en el mercado y alcanzar un mayor éxito en términos de participación y crecimiento.
+
+# **Líneas de acción y recomendaciones **
+
+Con nuestra estrategia en mente, se recomendaran lineas de accion estrategicas en base a los tres enfocques mencionados: Mantener clientes activos, potenciar el catálogo actual y adquirir nuevos clientes. 
+
+**Mantener clientes activos:**
+
+- Implementar programas de fidelización con el fin de recompensar la lealtad de los clientes activos y mantenerlos comprometidos con la empresa.
+- Personalizar los pedidos y ofrecer opciones de personalización para satisfacer las preferencias y necesidades individuales de cada cliente.
+- Establecer un sistema de seguimiento y atención al cliente para asegurarse de que sus necesidades sean atendidas de manera rápida y eficiente.
+
+**Potenciar el catálogo actual:**
+
+- Desarrollar estrategias de venta cruzada y upselling (de los productos identificados en el Market Basket) para fomentar la compra de productos adicionales o de mayor valor por parte de los clientes existentes.
+- Realizar colaboraciones estratégicas con proveedores o socios comerciales para ampliar el catálogo y ofrecer productos complementarios.
+- Ampliar el catálogo de productos ofrecidos debido a las oportunidades del mercado y estudios de demanda realizado
+
+**Adquirir nuevos clientes:**
+
+- Explorar los clientes prospectos propuestos en base a su objetivo y necesidades el cual llevará a duplicar el catálogo de clientes actual, potenciar el catálogo de productos y aumentar su cuota de mercado.
+- Realizar campañas de marketing dirigidas a los segmentos de mercado identificados como prospectos ideales.
+
+
+Con estas líneas de acción estratégica recomendadas, confiamos que estas permitirán mantener la lealtad de los clientes existentes, mejorar la rentabilidad y recurrencia de las ventas, así como captar nuevos clientes para expandir el negocio y aumentar la cuota de mercado.
+
+# **Escenario y modelo de riesgo** 
+Parte esencial de nuestra propuesta es crear un modelo de riesgo aplicado donde podamos identificar, evaluar y gestionar los riesgos de los mismos. Pudimos identificar 4 riesgos dentro de nuestra estrategias y adecuamos controles mitigantes para la gestión de los mismos. 
+
+## Identificación y gestión de riesgos{.tabset}
+
+### Exógeno
+
+*Fluctuaciones económicas importantes a nivel nacional o global*, como una recesión económica que reduzca la capacidad adquisitiva de los consumidores y disminuya la demanda de los productos de Alimentos y Snacks Monterrey.
+
+**Controles mitigantes**
+
+*Establecer alianzas estratégicas con proveedores o socios comerciales en diferentes regiones geográficas o países*. Esto proporciona una mayor estabilidad y diversificación en la cadena de suministro, lo que ayuda a mitigar el riesgo de interrupciones causadas por las fluctuaciones económicas en una región en particular.
+
+### Financiero
+
+*La falta de reactivación de clientes pasivos y la falta de estrategias de retención de clientes* tiene un impacto directo en la rentabilidad de la empresa, su posición competitiva en el mercado y su capacidad para mantener relaciones sólidas con los clientes.
+
+**Controles mitigantes**
+
+*Implementar un sistema de gestión de relaciones con los clientes (CRM, por sus siglas en inglés) y desarrollar programas de fidelización*. El CRM permite a Alimentos y Snacks Monterrey almacenar y gestionar información detallada de los clientes, incluyendo sus preferencias, historial de compras y comunicaciones anteriores. Esto proporciona una visión integral de cada cliente y ayuda a identificar oportunidades de reactivación. Mediante el uso del CRM, Alimentos y Snacks Monterrey puede diseñar estrategias personalizadas de comunicación y promoción para reactivar a los clientes pasivos, como el envío de ofertas especiales o recordatorios de productos relevantes.
+
+Además, desarrollar programas de fidelización efectivos puede ser un control mitigante importante. Estos programas ofrecen incentivos y beneficios exclusivos a los clientes existentes, lo que los motiva a seguir comprando y mantener una relación a largo plazo con Alimentos y Snacks Monterrey. Estos beneficios pueden incluir descuentos, regalos, acceso anticipado a nuevos productos o servicios, entre otros. Estos programas fomentan la lealtad del cliente y reducen la probabilidad de que se vayan a la competencia.
+
+### Operativo
+
+*Fallos en los sistemas informáticos o de producción*, lo que podría resultar en interrupciones en la cadena de suministro, retrasos en la entrega de productos o pérdida de datos importantes.
+
+**Controles mitigantes**
+
+*Mantener un equipo de soporte técnico interno y/o contar con un proveedor de servicios externo confiable que brinde asistencia técnica especializada* en caso de fallos en los sistemas. Esto asegura una respuesta rápida y eficiente ante cualquier incidente y minimiza el tiempo de inactividad de los sistemas y la producción.
+
+### Legal
+
+*Demandas o acciones legales presentadas por clientes o proveedores* debido a problemas de calidad de productos, incumplimiento de contratos o violación de regulaciones gubernamentales. Esto podría dar lugar a sanciones económicas, pérdida de reputación y costos legales significativos.
+
+**Controles mitigantes**
+
+*Implementación de políticas y procedimientos claros en relación a las transacciones comerciales y la gestión de contratos*.
+
+Asimismo, es importante que Alimentos y Snacks Monterrey cuente con un *seguro de responsabilidad civil o de protección legal* que cubra posibles reclamaciones o demandas legales. Este seguro puede ayudar a cubrir los costos legales y los posibles daños o perjuicios en caso de una demanda.
+
+## Matriz de riesgos
+
+```{r include=FALSE}
+riesgo=c('Fluctuaciones económicas importantes a nivel nacional o global','Falta de reactivación de clientes pasivos y de estrategias de retención de clientes','Fallos en los sistemas informáticos o de producción','Demandas o acciones legales presentadas por clientes o proveedores') 
+prob=c('Alto','Alto','Medio','Bajo') 
+score=c(4,4,3,2) 
+imp=c('Alto','Muy alto','Medio','Alto') 
+score1=c(4,5,3,4) 
+riesgoto=c(16,20,9,8) 
+riesgoto1=c('Alto','Muy alto','Medio','Medio') 
+mit1=c('Medio','Bajo','Bajo','Bajo') 
+mit2=c(3,2,2,2) 
+riesgores=c(13,18,7,6) 
+riesgores1=c('Medio','Alto','Bajo','Bajo') 
+df_riesgo=data.frame(riesgo,prob,score,imp,score1,riesgoto,riesgoto1,mit1,mit2,riesgores,riesgores1)  
+```
+
+```{r include=FALSE}
+names(df_riesgo)<-c('Descripción del riesgo','Probabilidad','Score','Impacto','Score','RT_n','RT_niv','EM_niv','EM_n','RR_n','RR_niv')
+```
+
+```{r}
+knitr::kable(head(df_riesgo),caption ='Matriz de riesgos') 
+```
+
+# **Referencias** 
+
+* Secretaría de Economía de los Países Bajos. (2021). *Coyuntura económica - III trimestre 2021*. Recuperado de http://datos.nl.gob.mx/portfolio_page/coyuntura-economica-iii-trimestre-2021/ 
+* Scherer, C. (2023). *A ggplot2 Tutorial for Beautiful Plotting in R*. Recuperado de https://cedricscherer.netlify.app/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/
+* ChatGPT, Comunicación personal, (Mayo 2023)
+* HB Alimentos. (s.f.). Nosotros. HB Alimentos. https://www.hbalimentos.com/index.html 
+* Sigma Alimentos. (2022). Nuestra empresa. Sigma Alimentos. https://www.sigma-alimentos.com/esto-es-sigma/
+* Sigma Alimentos. (2022). Información financiera. Sigma Alimentos. https://www.sigma-alimentos.com/informacion-financiera/
+* Scherer, C. (2023). *A ggplot2 Tutorial for Beautiful Plotting in R*. Recuperado de https://cedricscherer.netlify.app/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/
+* ENCUESTA NACIONAL DE INGRESOS Y GASTOS DE LOS HOGARES 2020 (ENIGH).(2020). En INEGI, de https://www.inegi.org.mx/contenidos/programas/enigh/nc/2020/doc/enigh2020_ns_presentacion_resultados_nl.pdf 
+* Ramírez, T. (2023, 27 de mayo). Entrevista personal HB Alimentos (Teléfono). Entrevista no publicada.
