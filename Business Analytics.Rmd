@@ -1,0 +1,1042 @@
+---
+title: "Final Evidence Report"
+author: "Chantal Simó A00827554"
+date: "27 April 2021"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: TRUE
+    toc_float:
+      smooth_scroll: FALSE
+      collapsed: FALSE
+---
+```{r include=FALSE}
+library(dplyr) 
+library(stringr) 
+library(assertive) 
+library(ggplot2)
+library(lubridate) 
+library(readxl)
+library(imputeTS)
+library(openxlsx)
+library(forcats)
+library(visdat)
+library(fuzzyjoin)
+library(finalfit)
+library(stringdist)
+library(visdat)
+library(e1071)
+library(gapminder)
+library(skimr)
+```
+
+```{r include=FALSE}
+videogame <- read_xlsx("vgsales.xlsx")
+```
+-----
+**Abstract:**
+As we know, the video game market is constantly growing and in this case it would be said exponentially due to its rapid boom in recent years. That is why the purpose of this research is to provide insights and results of the various exercises done in order for companies in this industry make decisions based on real data. This report will present the entire process of extraction, manipulation, and visualization of data from the **videogame** database. Likewise, this report is divided into 5 large sections where it can be seen that each one has a different exercise to comply with the aforementioned process.
+
+**Introduction:**
+At the moment video games have become one of the most profitable and commercially attractive industries of this decade. In 2017 alone, the global video game market exceeded $ 100 billion, a figure that marked a milestone in the history of this segment, registering a growth of more than 50% in five years. The market is led by video games for mobile devices (42%), followed by video games for consoles (31%) and for computers (27%), which include physical, downloadable and browser video games.
+
+**Objective:**
+my goal as a student and as a data analyst, on this occasion, is to clean and analyze a data set which will allow me to create a platform to visualize which video games have been the best-selling in the last few years as well as other interesting exploratory and descriptive analysis. All this work have the goal to identify user preferences and thus, be able to make decisions that open the opportunities for them building greater profitability.
+
+![](VG.jpeg)
+
+# Video games 1
+In this section you will see the processes to fix the type of data, cleaning blank or null data, and the elimination of duplicates.
+
+## Fixing Data Type 
+We start by seeing how the 'videogame' data frame is composed with the **Head** function and with the **Glimpse** function it will tell us how many rows, columns, and the type of data within each column of the data frame video games. As a result, this tells us it has 12 columns and 16,622 rows. By data type, it appears numeric and mostly character. 
+
+When looking at the data type of each column in the data frame, several observations were found. First, I found that the "YEAR" column is categorized as a character when it should be an integer by its rounded number. Second, all the columns that have "SALES" in their name (NorthAmerica_Sales, Europe_Sales, RestofWorld_Sales, and Total_Sales) all their data are known as characters when it should be numeric by its decimal numbers. Finally, the columns "WON_AN_AWARD" and "GENRE" that it recognized its data as a character when it should be a factor because of their categories.
+
+```{r echo=FALSE}
+head(videogame)
+glimpse(videogame)
+```
+
+As we can see, by using the function **Summary**, the numeric data type will calculate the minimum, median, mean, maximum, and quartiles. On the other hand, for the character data type, it will only appear the lengths, class, and mode.
+```{r echo=FALSE}
+summary(videogame)
+```
+
+**Fixing the column "Year":**
+Why is Year not integer? We need to delete the "year" text in its data. By deleting this now  will only appear the integer number of the year (Instead of "year 2002" it will only appear only "2002"). For this, we will be using the **Mutate** function to create a new column of the Year without "year" on it and the function **Select** to update the data frame with only the column that shows that Year is an integer. 
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+videogame <- videogame %>% mutate(Year_trimmed = str_remove(Year, "year"),Years =as.integer(Year_trimmed)) %>% 
+  select(Name, Console, Years, Genre, Publisher, NorthAmerica_Sales, Europe_Sales, Japan_Sales, RestofWorld_Sales, Total_Sales, Consumer_rating, Won_an_award)
+```
+
+Now it appears the minimum, median, mean, maximum, and quartiles for this new column 
+```{r echo=FALSE}
+summary(videogame$Years)
+```
+
+**Fixing the column "NorthAmerica_Sales, Europe_Sales, RestofWorld_Sales & Total_Sales": **
+In this case, we will do the same process to fix all the "Sales" columns in order to make them numeric instead of character. Here I use the **As.numeric** function to update the data frame by changing the old incorrect column to the new correct data type column.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+videogame$NorthAmerica_Sales <- as.numeric(videogame$NorthAmerica_Sales)
+videogame$Europe_Sales <- as.numeric(videogame$Europe_Sales)
+videogame$RestofWorld_Sales <- as.numeric(videogame$RestofWorld_Sales)
+videogame$Total_Sales <- as.numeric(videogame$Total_Sales)
+```
+
+Now we can observe that it appears the minimum, median, mean, maximum, and quartiles for all the columns that have "Sales" in their names.
+```{r echo=FALSE}
+summary(videogame$NorthAmerica_Sales)
+summary(videogame$Europe_Sales)
+summary(videogame$RestofWorld_Sales)
+summary(videogame$Total_Sales)
+```
+
+**Fixing the column "Genre", "Won_an_award", "Console" & "Publisher": **
+Here I use the **As.factor** function to update the data frame by changing the old incorrect column to the new correct data type column.
+```{r echo=TRUE}
+videogame$Won_an_award <- as.factor(videogame$Won_an_award)
+videogame$Genre <- as.factor(videogame$Genre)
+videogame$Console <- as.factor(videogame$Console)
+videogame$Publisher <- as.factor(videogame$Publisher)
+```
+
+Now we see that this arrangement divided these columns into  categories and counted how many are within each category. 
+```{r eval = FALSE}
+summary(videogame$Won_an_award)
+summary(videogame$Genre)
+summary(videogame$Console)
+summary(videogame$Publisher)
+```
+
+**Let's see a recap** 
+
+Making a recap of what we have already seen and fixed here we use this new function **(not seen in class)** where it makes us a summary of all the data frame of *videogames*. This function is call [Skim](https://www.youtube.com/watch?v=Ap1Q2fkqO_I) from the *skimr* library. This function tell us the number of columns, rows, the amount of data types we have, and a summary of each of the columns by the data type.
+
+What this show?: 
+1. For character type columns, it shows us if there are missing values, min/max, unique data, and blank spaces.
+2. For factor type columns, it shows us if there are missing values, unique data, and the amount of data that is per category.
+3. For numeric columns, it shows us if there are missing values, complete_rate, the mean, standard deviation, p0, p25, p50, p75, p100, and a small histogram of the data.
+```{r}
+# Need the skimr library for this function 
+skim(videogame)
+```
+
+## Cleaning the Data
+Since we have the correct data types in each column, it is time to clean up the data frame. For this, we will be checking all duplicates, out of range values, and replace null values that may exist in the data. 
+
+**Replacing NA for the Median:**
+Now that we have the correct data type for the Years columns,  it means that now it can calculate all dispersion measures and the amount of NA found in this column. As we can see it found 271 NA's in these columns. To replace all the NA found here we are going to replace it with its median.
+As you can see in this first chunk these are  all the calculation and count of NA in each column.This step is to check the before and after.
+```{r}
+summary(videogame$Years)
+```
+Replacing NA for the median in the column -> Years
+```{r}
+videogame$Years[which(is.na(videogame$Years))] = 2007
+```
+Now here we can see it doesn't appear anymore NAs
+```{r}
+summary(videogame$Years)
+```
+
+**Replacing NA for the Mean:**
+```{r}
+summary(videogame$NorthAmerica_Sales)
+summary(videogame$Europe_Sales)
+summary(videogame$RestofWorld_Sales)
+summary(videogame$Total_Sales)
+```
+The process is the same for all columns. First we call the original data frame with the column to replace NA. Here we use the **WHICH and IS.NA** function to designate that where there is NA in the  column X in the data frame Video Games should change it to the average. (The number is the average).
+
+Replacing NA for the mean in the column -> NorthAmerica_r_Sale,Europe_r_Sales, RestWorld_r_Sales & video_games1$Total_r_Sales
+```{r}
+videogame$NorthAmerica_Sales[which(is.na(videogame$NorthAmerica_Sales))] = 0.26
+videogame$Europe_Sales[which(is.na(videogame$Europe_Sales))] = 0.15
+videogame$RestofWorld_Sales[which(is.na(videogame$RestofWorld_Sales))] = 0.05
+videogame$Total_Sales[which(is.na(videogame$Total_Sales))] = 0.55
+```
+
+Now here we can see it doesn't appear anymore NAs
+```{r}
+summary(videogame$NorthAmerica_Sales)
+summary(videogame$Europe_Sales)
+summary(videogame$RestofWorld_Sales)
+summary(videogame$Total_Sales)
+```
+
+## Eliminating Duplicates
+In this part, we will analyze if there are duplicates in the database. Duplicate happens when all the features’ values within the observations are the same.
+
+Identify FULL duplicates (7 Full duplicate)
+```{r}
+sum(duplicated(videogame))
+```
+Deleting duplicate
+```{r}
+videogame <- distinct(videogame)
+disti
+```
+Now you can see there is no FULL duplicates 
+```{r}
+sum(duplicated(videogame))
+```
+
+# Video games 2
+In this section we will only work with the columns that have a data factor type. Here the factors will be manipulated, grouped and cleaned by the categories in which each column is separated and an arrangement of format, text and spaces will be made.
+
+## Dealing with Factor Levels
+As we see earlier there are 4 columns that have the factors data type, this columns are: "Genre", "Won_an_award", "Console" & "Publisher"
+
+**Analyzing Won_an_award:**
+Let's start by analyzing Won_an_award. As this only having two category it's easy to identify that this column is correct. Similarly, levels of a factor can be checked using the **levels** function.
+```{r}
+videogame %>% count(Won_an_award)
+```
+```{r}
+levels(videogame$Won_an_award)
+```
+
+**Analyzing Publisher:**
+In this case we can see that there are many categories in "Publisher" and that several of them have similar names. Example: 989 Sports and 989 Studios / Also Activision, Activision Blizzard and Activision Value. This leaves us told that this column must be reviewed. 
+```{r}
+videogame %>% count(Publisher)
+```
+level function for Publisher will not be shown due to its large and extensive content 
+```{r include=FALSE}
+levels(videogame$Publisher)
+```
+
+**Analyzing Genre:**
+As we can see, all the categories have different names and well written so we can deduce that this column is correct.
+```{r}
+videogame %>% count(Genre)
+```
+```{r}
+levels(videogame$Genre)
+```
+
+**Analyzing Console:**
+Although this is a column with many categories and some names are similar, I consider it correct because each video game console has a different name. However, I consider that depending on the consoles we can group them later.This leaves us told that this column must be reviewed. 
+```{r}
+videogame %>% count(Console)
+```
+```{r}
+levels(videogame$Console)
+```
+
+## Categorical Data Problems
+After analyzing the columns, it was concluded that we should check the column "Console" & "Publisher"
+
+**Grouping the column 'Console':**
+We can see that the console column has many categories that can be grouped to make smaller categories. An example of this can be the Play Station where there is several categories like: PS, PS2, PS3, PS4 PSP and PSV. 
+```{r include=FALSE}
+levels(videogame$Console)
+```
+
+First we see the amount of data by categories int he column 'Console' to see that we can join. 
+```{r}
+videogame %>% count(Console, sort = TRUE)
+```
+
+Now we collapse or group the categories
+```{r}
+videogame <- videogame %>% 
+  mutate(Console = fct_collapse(videogame$Console,
+                         PlayStation =	c("PS", "PS2", "PS3", "PS4", "PSP", "PSV", "SCD"),
+                         NintendoDS = c("3DS", "DS"),
+                         Xbox = c("X360", "XB", "XOne"),
+                         Computers = c("PC", "PCFX"),
+                         GameBoy = c("GB","GBA"),
+                         NintendoWii = c("Wii","WiiU"),
+                         Old_Consoles = c("2600", "3DO", "DC", "GC", "GEN", "GG", "N64","NES", "NG", "SAT", "SNES", "TG16", "WS"))) 
+```
+
+Now you can observe that the categories went from being 31 to only 7. Likewise, with the HEAD function we can see this new grouping in the data frame of video_games2
+```{r}
+videogame %>% count(Console, sort = TRUE)
+```
+
+**Grouping the column 'Publisher:**
+Like the column Console, we can see that the console column has many categories that can be grouped to make smaller categories. 
+```{r include=FALSE}
+levels(videogame$Publisher)
+```
+
+First, we are going to clean the data by trimming all the blank spaces and correct the string by making the first character of each word is uppercase.With this function now we have two new columns of publisher: one trimmed and the other with all the data having the first character of each word uppercase. 
+```{r}
+videogame <- videogame %>%  
+mutate(Publisher=str_to_title(Publisher), Publisher= str_trim(Publisher))
+```
+
+Because of the mutate we have to fix the data type for the Publisher column to factor again.
+```{r}
+videogame$Publisher <- as.factor(videogame$Publisher)
+```
+
+Then we see the amount of data by categories int he column 'Console' to see that we can join. 
+```{r}
+videogame %>% count(Publisher, sort = TRUE)
+```
+
+Now we collapse or group the some of the Publisher categories
+```{r message=FALSE, warning=FALSE}
+videogame <- videogame %>%  mutate(Publisher= fct_collapse(videogame$Publisher,
+                         Studios_989 =	c("989 Sports", "989 Studios"),
+                         Activision = c("Activision","Activision Blizzard","Activision Value"),
+                         Ascaron_Entertainment = c("Ascaron Entertainment","Ascaron Entertainment GmbH"),
+                         Data_Publishing = c("Data Age","Data Design Interactive","Data East"),
+                         Electronics = c("Electronic Arts","Electronic Arts Victor")))
+```
+
+Now we can see it group some of the Publisher categories
+```{r}
+videogame %>% count(Publisher)
+```
+If we want to see the top 10 Publisher it would be like this:
+```{r}
+videogame %>% count(Publisher, sort = TRUE)  %>% 
+  head(10)
+```
+
+# Video games 3
+In this section we are going to I fix all the out of range values and create graph to visualize where all the NAs are. In addition, we are also identifying the missing pattern. At last, remap the publisher data using string distance and left join. 
+
+## Replacing Out of Range Values
+As we can saw in the section 1, in all sales columns there are several positive and negative out-of-range data. For this, it has been decided to change these values for a more accurate criteria of how these values out of range could be.
+
+First of all, I want to highlight that a currency conversion will not be done due to two reasons: 1) apparently all these data seem to be in the same unit because the average of all is around 0.5. 2) Being very general places such as Europe and Rest of the world, these places have many countries that handle several different currencies so it cannot be justified by having only one currency.
+With that said, the criteria used for out-of-range data is that it will be replaced by it's mean. 
+
+**North America Sales **
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Years, y = NorthAmerica_Sales)) + 
+  geom_point(colour = "lightcoral", size = 1.5) +
+  geom_smooth(colour = "lightsalmon4") +
+  labs(title="NorthAmerica_Sales Out of Range Values", caption = "Figure 1.1: Out of range values in the North America sales") +
+  theme_light()
+```
+
+As we can saw in the graph, there are some out of range data. We ca filter with the function: **assert_all_are_in_closed_range** in order to see the specific out of range values. 
+```{r eval=FALSE}
+assert_all_are_in_closed_range(videogame$NorthAmerica_Sales, lower = 0, upper = 10)
+```
+
+Now its time to replace all the out of range value to Na's in order to visualize how this affect our data set and then replace it with the criteria stated. 
+```{r}
+videogame <- videogame %>%
+  mutate(NorthAmerica_Sales = replace(NorthAmerica_Sales, NorthAmerica_Sales > 10.00000, NA))
+```
+
+**Europe Sales**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Years, y = Europe_Sales)) +
+  geom_point(colour = "lightskyblue", size = 1.5) +
+  geom_smooth(colour = "lightblue4") +
+  labs(title="Europe_Sales Out of Range Values", caption = "Figure 1.2: Out of range values in the Europe sales") +
+  theme_light()
+```
+
+Then we filter the data. As we can see that Europe Sales have 2 out of range values
+```{r eval=FALSE}
+assert_all_are_in_closed_range(videogame$Europe_Sales, lower = 0, upper = 10)
+```
+Finally we replace the Europe sales is that all the data above 10 units by NA
+```{r}
+videogame <- videogame %>%
+  mutate(Europe_Sales = replace(Europe_Sales, Europe_Sales > 10.00000, NA))
+```
+
+**Japan Sales**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Years, y = Japan_Sales)) +
+  geom_point(colour = "tomato", size = 1.5) +
+  geom_smooth(colour = "tomato4") +
+  labs(title="Japan_Sales Out of Range Values", caption = "Figure 1.3: Out of range values in the Japan sales") +
+  theme_light()
+```
+
+Then we filter the data. As we can see Japan Sales have 10 out of range value. 
+```{r eval=FALSE}
+assert_all_are_in_closed_range(videogame$Japan_Sales, lower = 0, upper = 10)
+```
+Finally we replace the Europe sales is that all the data below 0 units by NA
+```{r}
+videogame <- videogame %>%
+  mutate(Japan_Sales = replace(Japan_Sales, Japan_Sales < 0, NA))
+```
+
+**Rest of the World Sales**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Years, y = RestofWorld_Sales))  +
+  geom_point(colour = "yellowgreen", size = 1.5) +
+  geom_smooth(colour = "darkolivegreen4") +
+  labs(title="RestofWorld_Sales Out of Range Values", caption = "Figure 1.4: Out of range values in the Rest of the word sales") +
+  theme_light()
+```
+
+By filtering the data we can see that Rest of the World Sales have 3 out of range values
+```{r eval=FALSE}
+assert_all_are_in_closed_range(videogame$RestofWorld_Sales, lower = 0, upper = 10)
+```
+Finally we replace the Rest of the World Sales is that all the data above 10 units by NA
+```{r}
+videogame <- videogame %>%
+  mutate(RestofWorld_Sales = replace(RestofWorld_Sales, RestofWorld_Sales > 10.00000, NA))
+```
+
+**Total_Sales**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Years, y = Total_Sales))  +
+  geom_point(colour = "sandybrown", size = 1.5) +
+  geom_smooth(colour = "sienna3") +
+  labs(title="Total_Sales Out of Range Values", caption = "Figure 1.5: Out of range values in the Total sales") +
+  theme_light()
+```
+
+By filtering the data we can see that Total Sales have 2 out of range values
+```{r eval=FALSE}
+assert_all_are_in_closed_range(videogame$Total_Sales, lower = 0, upper = 40)
+```
+Finally we replace the Total_Sales data that is above 40 units by NA
+```{r}
+videogame <- videogame %>%
+  mutate(Total_Sales = replace(Total_Sales, Total_Sales > 40.00000, NA))
+```
+
+## Visualizing & Fixing Missing Values
+Now we are counting the missing values in the entire data set with the functions **SUM and IS.NA.** As we can see there is a total of 71 missing values in the data frame  
+```{r}
+sum(is.na(videogame))
+```
+
+Also with the **VIS_MISS** function from the "visdat" library, we can see the nulls that are inside the complete data frame. 
+```{r}
+vis_miss(videogame) +
+  labs(title = "Missing values per column", caption = "Figure 1.6: Missing data  analysis in videgames")
+# Another great visualization tool is missing_plot()
+```
+
+Based on the outcome of the missing values graph, this can be concluded that this is NOT a severe case of missing data. This is because the graph shows that the errors occupy less than 0.1% of the total values, so it is considered a non-severe case. 
+
+**Identifying the missing pattern**
+
+Here we use this new function **(not seen in class)** called missing_pattern and this produces a table and a plot showing the pattern of missingness between variables. the function is [missing_pattern](https://cran.r-project.org/web/packages/finalfit/vignettes/missing.html ) from the Finalfit library. Here appear the count of missing values in the column that apply. There are 10 patterns in this data. The number and pattern of missingness help us to determine the likelihood of it being random rather than systematic.
+
+```{r}
+# Need the finalfit library for this function 
+videogame %>% missing_pattern(explanatory = )
+```
+
+As we analyze with the missing_pattern function we can conclude that this missing values are missing at random (MAR). This missing data values do not relate to any other data in the data set and there is some pattern to the actual values of the missing data themselves. When we filtered the data in the previous exercises we could see that all the data that was perceived as out of range was classified as NA. With this in mind, these targets are very random since they do not have any type of connection with other columns, or the conclusion per se.
+
+## Replacing NAs 
+Now that we know where is all the NAs thank to the previous graph. Now its time to replace all the NAs found in orden to have a clean data set. As we can see in the summary now it appear all the NA in the Sales column.
+```{r echo=FALSE}
+summary(videogame$NorthAmerica_Sales)
+summary(videogame$Europe_Sales)
+summary(videogame$Japan_Sales)
+summary(videogame$RestofWorld_Sales)
+summary(videogame$Total_Sales)
+```
+
+Finally, we replace all the NA by the mean of each column 
+```{r}
+videogame$NorthAmerica_Sales[which(is.na(videogame$NorthAmerica_Sales))] = 0.25
+videogame$Europe_Sales[which(is.na(videogame$Europe_Sales))] = 0.15
+videogame$Japan_Sales[which(is.na(videogame$Japan_Sales))] = 0.079
+videogame$RestofWorld_Sales[which(is.na(videogame$RestofWorld_Sales))] = 0.048
+videogame$Total_Sales[which(is.na(videogame$Total_Sales))] = 0.54
+```
+
+As we can see, now there are no more nulls
+```{r}
+sum(is.na(videogame))
+```
+And to confirm it let see the graph again
+```{r}
+vis_miss(videogame) +
+  labs(title = "Clean missing values", caption = "Figure 1.8: Missing data cleaning in videgames")
+vis_
+```
+
+## Remapping using string distance
+
+Here we are going to remap using the string distance in the column of *Publisher* .Here I took all 500 publishers and export the list to an excel file, then  clean it further and eliminate those that repeat or are wrongly writed. 
+
+```{r}
+publisher <- read_xlsx("Publisher.xlsx")
+```
+
+**stringdist** is a function that can easily solve most text data problems with a single piece of code. In this case, we are making a left_join with a database that has the correct names with the database with the wrong names.With this function, misspelled names will be identified and changed to the correct ones using a *Damerau-Levenshtein* change method. 
+
+Now we can see this run and work, and here you can visualize the head of the column just fix . 
+```{r}
+stringdist_left_join(videogame, publisher, by = "Publisher", method = "dl") %>% head(10)
+```
+
+# Video games 4
+In this section we will see multiple graphs of different types for the representation of the data. Also we'll crossed tables with factors and we analyzed text about the news of the rise of video games where we analyzed the repetitions of words, gave formats to the text and found insights.
+
+## From Counts to Proportions
+
+**Tables for 1 and 2 variables**
+Since we will now work with factors it is important that for our first part we see the levels of the factors that we will use for today's exercise. In this case we will see the levels of "Genre" and "Won an award"
+```{r include=FALSE}
+library(knitr) #to use kable
+levels(videogame$Genre)
+levels(videogame$Won_an_award)
+```
+
+**Let's do a cross tab between won an award and gender**
+
+For the exercise we will make a cross table of these two variables mentioned with the function **Table**. As we can see in the table, here they show which were the genres of video games that won a prize and those that did not with a frecuency format. From the results it is very obvious to conclude that the majority did not win.
+```{r}
+table1<- table(videogame$Genre, videogame$Won_an_award)
+t(table1)
+```
+
+**Cross tab with percentages**
+
+The tables with only the frequencies do not give us as many insights as a table shown in percentage. In this case that is what we will do when using the **PROP.TABLE** function and multiplying the values by 100.
+
+In the results we can see that the genres of action, sports, and Misc are those with the highest percentage of prize loss. In the other case, we can see that the rate of genres that win prizes is very low.
+```{r}
+prop.table(table1)*100
+```
+With the sum we can confirm that the percentages are with respect to the total so when adding all the decimals this has to give us 100
+```{r include=FALSE}
+sum(prop.table(table1))*100
+```
+
+**Now let's compute the percentages by row:**
+
+In this case, here we compute the percentages by rows. In other words, the total percentage per row will be calculated in a base of 100%. From the results we can see that platform games have a 97% probability that they will not win and a 2% probability that they do. For the most part, all genres have a percentage of probability that they will not earn high enough and that they will earn very low.
+```{r}
+prop.table(table1,1)*100
+```
+Being 12 rows, we can expect the sum of 100% of each would give us a sum of 1200
+```{r include=FALSE}
+sum(prop.table(table1,1)*100)
+```
+
+**Now let's compute the percentages by column:**
+
+On the contrary, now we are going to compute the percentages per column where each column represents a total of 100%. From the results we see that most of the genres of games that do not win prizes are action, sports and misc. On the contrary, the genres that win the most games are action, platform, racing and sports.
+```{r}
+prop.table(table1, 2)*100
+```
+Since there are two columns, we expect the sum of the rows to be 200
+```{r include=FALSE}
+sum(prop.table(table1,2)*100)
+```
+
+## Visualization of the Data 
+Information visualization is one of the most important processes when it comes to presenting information, extracting insights and making decisions. In this case, several visualization exercises will be shown through different types of graphs.
+
+**Basic chart:**
+In this graph we can see the genres of video games that are most on the market (popularity). From the results we have that the genre of video games most played are action games with more than 3000 units. Second, we have sports games with more than 2000 units and in third we have misc games with more than 1500 units. On the contrary, we can see that the least popular game genre is that of puzzles and strategy.
+
+```{r echo=FALSE}
+ggplot(videogame, aes(x = Genre)) + 
+  geom_bar(fill="paleturquoise1", color= "black") +
+  labs(title="Most popular video game genre", subtitle = "(Simple Bar Graph)", caption = "Figure 2.1: Video games genre") +
+  theme_light()
+```
+
+**Bar graph:**
+In this graph we can see the results of the cross tables that I did in the last exercise. Here we can see all the video game genres with the number of video games that won an award in yellow and those that did not in red. As previously concluded, most of these video game genres did not win a award Here you can see the great difference between those who won (that is very minimal) and those who lost
+
+```{r echo=FALSE}
+ggplot(videogame, aes(x = Genre, fill = Won_an_award)) + 
+  geom_bar(position = "dodge")+ 
+  scale_fill_manual(values=c("indianred2","gold")) +
+  labs(title="Video games genre that an a award", subtitle = "(Bar Graph)", caption = "Figure 2.2: Wining percentage of video games genre") +
+  theme_light()
+```
+
+**Stacked bars:**
+Here we can see the same results, only that the visualization method is different since this is a cumulative bar graph. Being a cumulative graph, we can see that both colors blue (lost) and green (won) together in the same bar of each category. It's results are the same as the previous graph. 
+```{r echo=FALSE}
+ggplot(videogame, aes(x=Genre, y=Won_an_award, fill = Won_an_award)) +
+  geom_bar(stat="identity")+
+  scale_fill_manual(values=c("darkslategray4","chartreuse")) +
+  coord_flip() +
+  labs(title="Genre that an a award", subtitle = "(Flipped Stacked Bar Graph)", caption = "Figure 2.3: Wining percentage of video games genre") +
+  theme_light()
+```
+
+**Histogram & Faceting:**
+In this graph we can see in a unique way each category and its result in a different table. For better understanding, let's take the example of the action genre. Here we can see by categories such as the rating given by users. The more video games there are per category, the greater the height of the bars, showing that they are the most repeated qualification in each one. The results:the action genred is the most popular and the one with the most highest rating.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(Consumer_rating)) + 
+  geom_histogram(color="black", fill="gold") +
+  facet_wrap(~ Genre) +
+  labs(title="Histogram: Videogame genre with the most consumer rating",  caption = "Figure 2.4: Consumer rating per video game genre") +
+  theme_light()
+```
+
+**Density plot:**
+In this graph we can see a density graph divided into two colors: red (those that did not win a prize) and blue (those that did win). On the X axis is the rating of the consumer towards the different video games. As a result we can see the relationship of the ratings given with the probability that they win or not a prize. We can see that those who won prizes mostly have a rating greater than 75 points while those who lost have less than 65 point.
+
+The middle line tells us what is the average rating that consumers give to video games and this tells us that it is approximately 30-35 points. These leave us told that most of these games did not win a prize and only a select percentage did win a prize.
+
+```{r echo=FALSE}
+ggplot(videogame, aes(x = Consumer_rating, fill = Won_an_award)) + 
+  geom_density(color="black", alpha=0.7)+
+  geom_vline(aes(xintercept=mean(Consumer_rating)),color="grey", linetype="dashed", size=1) +
+  labs(title="Consumer rating of videogames", subtitle = "(Density plot)",  caption = "Figure 2.5: Difference between the rating of genre that won and not won") +
+  theme_light()
+```
+
+**Lines graph & facet_wrap:**
+In this case, a chart was made to show how sales have been in the different regions of the world over the years. It should be emphasized that these graphs do not have nulls nor out of range values(this data were cleaned and replaced earlier). As we know, each region has a maximum of 10 units and a minimum of 0 units without counting the total sales that its maximum is 40 units(because it is the sum of the other graphs)
+
+As we can see here, sales in the United States are the largest sales by region while in the opposite, sales to the rest of the world reporting the lowest sales. In general, we can see that in general, the graphs growth in sales is appreciated from 2005 and beyond. We can confirm this results with what is analyzed in the different news where it specifies the rise of video games were from 2003-2006.
+```{r include=FALSE}
+#Need the tidyr library
+library(tidyr)
+vgTALL <- videogame %>% gather(key = Sales, value = value, NorthAmerica_Sales:Total_Sales)
+```
+
+```{r echo=FALSE}
+ggplot(vgTALL, mapping = aes(x = Years, y = value)) +
+  geom_line(color = "navyblue") + 
+  facet_wrap(~Sales) +
+  theme_light() +
+  labs(title=" Video games sales over the years", caption = "Figure 2.6: Total sales over the years ")
+```
+
+
+## Text Mining
+```{r include=FALSE}
+library("tm")  # for text mining
+library("SnowballC") # for text manipulation
+library("wordcloud") # word-cloud generator 
+library("RColorBrewer") # color palettes
+```
+
+**Natural Language Processing**
+The first thing we will do is import a text from the news about the rise of the video game market and convert it from text to corpus .
+```{r message=FALSE, warning=FALSE}
+#Let's start by importing the text to analyze
+text <- readLines(("Videogames News.txt"), warn=FALSE)
+```
+
+```{r}
+docs <- Corpus(VectorSource(text)) 
+```
+
+## General Text Cleaning
+In this part we take care of cleaning the text in different ways:
+
+**Convert the text to lower case**
+```{r message=FALSE, warning=FALSE}
+docs <- tm_map(docs, content_transformer(tolower))
+```
+**Remove numbers**
+```{r message=FALSE, warning=FALSE}
+docs <- tm_map(docs, removeNumbers)
+```
+**Removing english common stopwords**
+```{r message=FALSE, warning=FALSE}
+docs <- tm_map(docs, removeWords, stopwords("english"))
+```
+**Remove punctuation**
+```{r message=FALSE, warning=FALSE}
+docs <- tm_map(docs, removePunctuation)
+```
+**Eliminate extra white spaces**
+```{r message=FALSE, warning=FALSE}
+docs <- tm_map(docs, stripWhitespace)
+```
+
+## Analyzing words and document frequency
+Once the text has been cleaned and everything is formatted the same, we convert the document to matrix which is a table containing the frequency of the words.
+```{r}
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+head(d, 10)
+```
+
+**Word clouds:** 
+With the Word Cloud we can see which are the most repeated words in the text. The bigger the word means that it has more frequency in the text. In this case it will only show the word that have been repeated in the text more than 5 times. As a results: Games, Millions, Expected, Will and Euros are the words that repeat the most. 
+```{r echo=FALSE}
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 5,
+          max.words=Inf, random.order=T, rot.per=0.5, 
+          colors=brewer.pal(8, "Set3"))
+```
+
+With the function **findAssocs** we can see all the words that are associated with the word 'game'. In other words, here we can see the words that normally go together with the word "game" in the text and their association percentage above 50% (0.5).
+```{r}
+findAssocs(dtm, terms = "games", corlimit = 0.5)
+```
+
+At last, here we can see a graph of the top 10 words with the most repetition in the text in descending order. As a result we can see that the most repeated word is "games" and the least repeated is "grow" within the top 10.
+```{r}
+barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
+        col ="lightsteelblue2", main ="Top 10 Most frequent words",
+        ylab = "Word frequencies")
+```
+
+
+# Video games 5
+In this last section we will see the calculation of the central tendency measures, variability and shape measure. Also will see some correlation analysis and probability analysis. 
+
+## Central Tendendcy, Variability & Shape Measure
+For this exercise, we are going to filter the data to see only the data that occurred in 2006 (mean year of the data set) and we will call this new data frame Sales_2006
+```{r}
+Sales_2006 <- videogame %>% filter(Years == 2006)
+```
+
+Here we will see a summary of the data already filtered in the new data frame.
+```{r}
+summary(Sales_2006)
+```
+
+Now, let's compute the central tendency, variability, and shape statistical measures for the sum of all the sales in 2006 (total sales). 
+```{r}
+mean(Sales_2006$Total_Sales) #mean
+var(Sales_2006$Total_Sales) #variance
+sd(Sales_2006$Total_Sales) #st deviation
+median(Sales_2006$Total_Sales) #median
+quantile(Sales_2006$Total_Sales, 0.90) #percentile 90
+min(Sales_2006$Total_Sales) #minimum
+max(Sales_2006$Total_Sales) #maximum
+range(Sales_2006$Total_Sales) #range
+skewness(Sales_2006$Total_Sales) #skewness
+IQR(Sales_2006$Total_Sales) # interquartile range
+diff(range(Sales_2006$Total_Sales)) # Range
+```
+
+The **coefficient of variation** (CoV) is the ratio of the standard deviation to the mean. The higher the coefficient of variation, the greater the level of dispersion around the mean. Vice versa, the lower the value of the coefficient of variation, the more precise the estimate. In this case we can observe that the CoV is 3.5. This result is pretty low so we can confirm that this data is precise.
+```{r}
+CoV <- sd(Sales_2006$Total_Sales)/mean(Sales_2006$Total_Sales)
+CoV
+```
+
+The **trimmed mean** (similar to an adjusted mean) is a method of averaging that removes a small designated percentage of the largest and smallest values before calculating the mean. It helps eliminate the influence of outliers or data points on the tails that may unfairly affect the traditional mean. In this case the trimmed mean give us a result of 0.209 (Lower than the normal mean of 0.449)
+```{r}
+#Trimmed mean
+mean(Sales_2006$Total_Sales, trim = .1)
+```
+
+Here we are going to add new column to the data frame in which will appear the **Z score** of the  the data int he column total sales
+```{r}
+Sales_2006 <- Sales_2006 %>% 
+  mutate(Sales06_zscore = scale(Sales_2006$Total_Sales))
+```
+
+Now lets see if we have outliers. In this case we found that there are 7 of them by filter the 2006 Sales zscore are bigger than 3. 
+```{r}
+Sales_2006 %>% 
+  filter(Sales06_zscore > 3)
+```
+
+Now we will see which are the top 10 total sales by name and publisher. In top 3 we have the Nintendo for the games New Super Mario Bros (30), Wii Play	(29) and  Pokemon Diamond/Pearl (18). 
+```{r}
+# Top 10 total sales
+rank <- Sales_2006 %>% 
+           select(Name, Publisher, Total_Sales, Sales06_zscore) %>% 
+           arrange(desc(Total_Sales)) %>% head(10)
+kable(rank)
+```
+
+Now we are making a density plot in order to visualize the data that we previously discuss. For the total sales in 2006 we can see that the results are mostly right skewed, because almost all its data is concentrated in the right part of the graph (close to 0 on the X axis) and also has a large difference bias. 
+```{r echo=FALSE}
+ggplot(Sales_2006, aes(x = Total_Sales)) +  
+  geom_density(color="black", fill= "paleturquoise1", alpha = 8) +
+  labs(title="2006 Total Sales", subtitle = "(Density plot)", caption ="Figure 3.1: Bias of difference in total sales 2006 ") +
+  theme_light()
+```
+
+The skewness is a measure of the symmetry of a distribution. In this case we can see that this plot have a high skewness meaning that the plot is very asymmetrical. with the function **skewness** we can se the skewness of the plot above. As a result we got a skew of 13.92 units. This is very large difference bias for this chart. 
+```{r}
+skewness(Sales_2006$Total_Sales)
+```
+
+For better visualization we can transform the data into its logarithm form. With this we can visualize better the plot and also low the skewness. we got before. 
+```{r}
+Sales_2006 <- Sales_2006 %>%
+  mutate(log_Total_Sales = log(Total_Sales))
+```
+
+Now we can see that the graph can be appreciated much better and now it is more symmetrical. This is because we used the logarithm values of the total sales unit.(The line in the middle show us the mean).
+```{r echo=FALSE}
+ggplot(Sales_2006, aes(x = log_Total_Sales)) +  
+  geom_density(color="black", fill= "paleturquoise1") +
+  geom_vline(aes(xintercept=mean(log_Total_Sales)),color="grey", linetype="dashed", size=1) +
+  labs(title="2006 Total Sales", subtitle = "(Density plot with the logarithm form)", caption ="Figure 3.2: Bias of difference in total sales 2006 ") +
+  theme_light()
+```
+
+As we can see the comparison between the skewness of the first graph and the second have change a lot.With the logarithm form the skewness low from 13.9 units to 0.4
+```{r}
+skewness(Sales_2006$log_Total_Sales)
+```
+
+## Graphing logarithm
+
+**Total_Sales x Won_an_award:**
+In this case we are going to group the sales by the video games that won and did not win a prize. Here we do a **groupby** by Won_an_award and we make a summary containing the average, standard deviation, median, quantile of 90% and its interquartile range. Then for better visualization we make a transpose of the results.
+
+From the results we can see that the average, standard deviation, median, quantile of 90% and the interquartile range of total sales in the 8 video games that did win a award is much higher than  the 1002 video games that did not win a award. 
+```{r echo=FALSE}
+TSales_2006 <- Sales_2006 %>%
+  group_by(Won_an_award) %>%
+  summarize(mean(Total_Sales),
+            sd(Total_Sales),
+            median(Total_Sales),
+            quantile(Total_Sales, (.90)),
+            IQR(Total_Sales),
+            n())
+kable(TSales_2006)
+```
+
+This Box plot confirms the previous results. Here we can see that the total sales are higher (the double sale)for the video games that won an award rather than the other that not won in exception of two cases that not won an award but got a high sells. (This graph have the total sales in logarithm in order to have for better visualization and short the skewness.)
+
+```{r echo=FALSE}
+ggplot(Sales_2006, aes(x = log(Total_Sales), y = Won_an_award)) +
+  geom_boxplot(fill='gold', color="black", outlier.shape=3,outlier.size=3) +
+  coord_flip() +
+  labs(title="Video games that won an award total sales ", subtitle = "(Density plot with the logarithm form)", caption ="Figure 3.3:Video games that won an award total sales ") + theme_light()
+  
+```
+
+
+**Total_Sales x Genre:**
+Like the previous exercise, we are going to group the sales by the video games  genre with a **groupby**. We will calculate the average, standard deviation, median, quantile of 90% and its interquartile range for this exercise. 
+```{r echo=FALSE}
+GSales_2006 <- Sales_2006 %>%
+  group_by(Genre) %>%
+  summarize(mean(Total_Sales),
+            sd(Total_Sales),
+            median(Total_Sales),
+            quantile(Total_Sales, (.90)),
+            IQR(Total_Sales),
+            n())
+kable(GSales_2006)
+```
+
+This Box plot confirms the previous results. Here we can see that most of the total sales in 2006 were thanks to the sales of racing, racing, fighting and sports video games. These three were the ones that had the highest sales except for some cases of platform games, misc and role playing games that had games that had great sales too.(This graph have the total sales in logarithm in order to have for better visualization and short the skewness.)
+```{r echo=FALSE}
+ggplot(Sales_2006, aes(x = log(Total_Sales), y = Genre)) +
+  geom_boxplot(fill='gold', color="black", outlier.shape=3,outlier.size=3)+
+  coord_flip () +
+  labs(title="Best-selling video game genre in 2006", subtitle = "(Density plot with the logarithm form)", caption = "Figure 3.3: Best-selling video game genre in 2006") +
+  theme_light()
+```
+
+
+## Correlation Analysis 
+For this practice lets investigate the association between NorthAmerica_Sales and Europe_Sales.
+
+To know the correlation between data we will use this new function **(not learned in class)** called [cor.test](http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r). This function tests for association between paired samples, using one of Pearson's product moment correlation coefficient, Kendall's or Spearman's. This correlation test returns both the correlation coefficient and the significance level (or p-value) of the correlation. 
+
+In this case we will see the correlation between NorthAmerica_Sales and Europe_Sales (the two main region of video games sales) with the Pearson's product-moment correlation. 
+```{r}
+cor.test(videogame$NorthAmerica_Sales, videogame$Europe_Sales)
+```
+
+In the result above we have :
+1. t is the t-test statistic value (t = 119.68),
+2. df is the degrees of freedom (df= 16613),
+3. p-value is the significance level of the t-test (p-value = 2.2e-16).
+4. conf.int is the confidence interval of the correlation coefficient at 95% (conf.int = [0.6721886 0.6885212]);
+5. sample estimates is the correlation coefficient (Cor.coeff = 0.6804394).
+
+Due to this result, the p-value of the test is 2.2e-16, meaning both groups have significance differences in the mean values of that variable.
+
+
+With this plot we can assume that both columns are some how correlate in some parts (mostly in the right skew of the plot)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(y = NorthAmerica_Sales, x = Europe_Sales)) +  
+  geom_point(color="lavenderblush4") +
+  stat_ellipse() +
+  geom_smooth(method=lm, linetype="dashed", color="black") +
+  labs(title=" Correlation between North America Sales & Europe Sales", subtitle = "(Scatter plot)",caption ="Figure 3.4: Correlation Analysis")+
+  theme_light()
+```
+
+In this graph we can see the relationship between NorthAmerica_Sales and Europe_Sales categorized by awards they have won. As we can see, both lines show no relationship in the results. For example in the right line in the graph of those who did not win we have that North America has many video games sold that did not win compared to Europe in certain aspects. Similarly in the graph of the video games sold that won an award.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(y = NorthAmerica_Sales, x = cut(Europe_Sales, breaks = 2))) +  
+  geom_point(color="lavenderblush4") +  
+  geom_smooth(method=lm)  +  
+  facet_wrap(~ Won_an_award) +
+  labs(title=" Scatter plot: NorthAmerica_Sales x Europe_Sales")+
+  theme_light()
+```
+
+## Probability using Normal Distribution 
+The first step is to take the average and the standard deviation that we will use to obtain the probabilities.
+```{r include=FALSE}
+mean(videogame$Total_Sales)
+sd(videogame$Total_Sales)
+```
+Now we are computing basic probabilities with the function **pnorm** that returns the integral from −∞ to q of the function of the normal distribution where q is a Z-score. We input the mean and the standar deviation of *Total Sales* and input the data we want to be grater than (P(x<2)). This give us a  a result of 0.85, meaning that it is near the mean and have a 85% of chance of this values being smaller than 2 
+```{r}
+pnorm(2, mean = 0.5431116, sd = 1.384904, lower.tail = T)
+```
+
+The function **rnorm** simulates a normally distributed variable. In this case we will follow the normal distribution for the column Total_Sales in its different range. The normal distribution is a probability distribution that is symmetric about the mean, showing that data near the mean are more frequent in occurrence than data far from the mean
+```{r}
+n10 <- rnorm(10, mean = 0.5431116, sd = 1.384904)
+n100 <- rnorm(100, mean = 0.5431116, sd = 1.384904)
+n1000 <-  rnorm(1000, mean = 0.5431116, sd = 1.384904)
+n10000 <-  rnorm(10000, mean = 0.5431116, sd = 1.384904)
+```
+
+In the histogram bellow we can see all the normal distribution vectors break it in 10, 100, 1,000 and 10,000. **Insight:** As the size of the vector increases the more symmetrical the histogram gets because it follow the normal distribution. This is the proof that this follow the central limit theorem that sate *"the higher the sample size of number of observations, the more normally distributed that he distribution become."*
+```{r echo=FALSE}
+hist(n10, breaks = 5)
+hist(n100, breaks = 25)
+hist(n1000, breaks = 50)
+hist(n10000, breaks = 100)
+```
+
+
+# Conclusion 
+To conclude, with all the analysis done we can draw many insides that can be of use and value for companies in the video game industry. All this process of data extraction, manipulation, cleaning and visualization was very useful to test our ability to analyze data. However, I consider all this a very enriching process to develop our practical skills of data manipulation in Rstudio and the expansion of knowledge on the subject.
+
+As we have been saying from the beginning, the video game industry is an industry that is constantly growing. We were able to approve this thanks to all the analysis done with the **videogames** database and with the validation of information with the news found about the growth of this market. I would describe the behavior of video game sales with an almost linear growth. I say this because with the graphics seen, over the years, sales have increased, although there have been years where they have fallen a little, they have risen again and with much more force. In addition, taking into account the pandemic, according to the news, video game sales have doubled, which can be an evaluated as a  exponential growth in the sales.
+
+Given the insights and results found, I can say with certainty that the video game market is a market that I would support, because of  its growth in recent years. Also according to the news, this market may increase more due to the technological advances that we will see and the new target market that is in view.
+
+## Main Insights: 
+
+**1. Average sales of video games in the last decades in North America, Europe, Japan and worldwide**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sales_10 <- videogame %>% filter(Years == 2010:2020)
+mean(sales_10$NorthAmerica_Sales)
+mean(sales_10$Europe_Sales)
+mean(sales_10$Japan_Sales)
+mean(sales_10$RestofWorld_Sales)
+```
+The the average sales of the last decade on each region are: North America 0.24, Europe 0.20, Japan 0.06 and Rest of the word 0.06. 
+
+**2. Year in which global video game sales were at its highest:** 
+The highest year was between 2006-2010: 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x=Years, y=Total_Sales, fill=Years)) +
+  geom_bar(stat="identity") +
+  labs(title = "Year of the highest video game sales")+
+  theme_light()
+```
+
+**3. Game console that has released the majority of video games:**
+The console that has released the majority of video games are PlayStation 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Console)) + 
+  geom_bar(fill="sienna2", color= "black") +
+  labs(title="Game console that has released the majority of video games") +
+  theme_light()
+```
+
+**4. Genre with the most video games:**
+The genre with the most video games is the action genre. 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Genre)) + 
+  geom_bar(fill="royalblue3", color= "black") +
+  labs(title="Genre with the most video games") +
+  theme_light()
+```
+
+**5. Publisher who has distributed the majority of video games:**
+Here we have the top 10 publishers. On fist place we have Electronics, in second Activision and in  third Namco Bandai Games.  
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+top10_publisher <- videogame %>% count(Publisher, sort = TRUE)  %>% 
+  head(10) 
+kable(top10_publisher)
+```
+
+**6. Video games sales on each region over 40 years:**
+As we can see here, sales in the United States are the largest sales by region while in the opposite, sales to the rest of the world reporting the lowest sales. In general, we can see that in general, the graphs growth in sales is appreciated from 2005 and beyond. We can confirm this results with what is analyzed in the different news where it specifies the rise of video games were from 2003-2006.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(vgTALL, mapping = aes(x = Years, y = value)) +
+  geom_line(color = "navyblue") + 
+  facet_wrap(~Sales) +
+  theme_light() +
+  labs(title=" Video games sales over the years")
+```
+
+**7. Correlation between consumer rating and sales**
+Here we can see that the relationship of consumer ratings and total sales are well aligned. Here in the graph we can see that the higher the rating, the higher the sales due to the popularity and reputation of the video game. On the other hand, we can see that the lower the rating, the lower the sale of these video games.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(y = Total_Sales, x = Consumer_rating)) +  
+  geom_point(shape=1, color="salmon", size=3) +
+  geom_smooth(method=lm, linetype="dashed", color="black") +
+  labs(title="Correlation between consumer rating and sales") +
+  theme_light()
+```
+
+**8. Difference in rating and sales by won or not an award**
+In this graph we can see a density graph divided into two colors: red (those that did not win a prize) and blue (those that did win). On the X axis is the rating of the consumer towards the different video games. As a result we can see the relationship of the ratings given with the probability that they win or not a prize. We can see that those who won prizes mostly have a rating greater than 75 points while those who lost have less than 65 point.
+The middle line tells us what is the average rating that consumers give to video games and this tells us that it is approximately 30-35 points. These leave us told that most of these games did not win a prize and only a select percentage did win a prize
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x = Consumer_rating, fill = Won_an_award)) + 
+  geom_density(color="black", alpha=0.7)+
+  geom_vline(aes(xintercept=mean(Consumer_rating)),color="grey", linetype="dashed", size=1) +
+  labs(title="Consumer rating of videogames", subtitle = "(Density plot)",  caption = "Figure 2.5: Difference between the rating of genre that won and not won") +
+  theme_light()
+```
+
+**9. Video games Genre with the highest number of video games that have won an award:**
+As we can see in the table, here they show which were the genres of video games that won a prize and those that did not with a frequency format. From the results it is very obvious to conclude that the majority of them didn't win. Even though the majority of them didn't win, the genre with the most award is the action genre with 33 and Sports with 20. 
+```{r echo=FALSE}
+vg_genre<- table(videogame$Genre, videogame$Won_an_award)
+kable(vg_genre)
+```
+
+**10. Most popular console through the years**
+In the case of old consoles, we can see that they have their peak was from the 1990s to 2003 approximately, while the gaming computers (which are the newest) are the most popular recently with a boom period from 2007 to 2011 approximately.
+The points that we see represent the cases that are outside the range estimated by the box plot as we see with the Nintendo DS. These had their popularity during 2007 and 2012 and with cases in 2020 (the point seen).
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(videogame, aes(x=Console, y=Years, color=Console)) +
+  geom_boxplot() +
+  labs(title="Most popular console through the years")+
+  theme_light()
+```
+
+## Reference 
+Daniel Quintana. (2019, June 5). Exploring, cleaning, and analysing data in R [Video file]. Retrieved from https://www.youtube.com/watch?v=Ap1Q2fkqO_I
+
+STHDA. (n.d.). Correlation Test Between Two Variables in R - Easy Guides - Wiki - STHDA. Retrieved April 29, 2021, from http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r
+
+Harrison, E. (n.d.). Missing data. Retrieved April 29, 2021, from https://cran.r-project.org/web/packages/finalfit/vignettes/missing.html
+
+Av451, R. (2018, October 30). El sector de videojuegos crecerá en España un 3,6 por ciento en el próximo lustro. Retrieved April 29, 2021, from https://www.audiovisual451.com/el-sector-de-videojuegos-crecera-en-espana-un-36-por-ciento-en-el-proximo-lustro/
+
+Herrero, P. (2020, December 26). La industria del videojuego facturó en 2020, en todo el mundo, más que el cine y los deportes juntos en EEUU. Retrieved April 29, 2021, from https://as.com/meristation/2020/12/26/noticias/1608992024_963325.html#:%7E:text=Las%20cifras%20de%20los%20videojuegos%20en%202020&text=Sin%20embargo%2C%20por%20otro%20lado,de%20hardware%20como%20de%20software.
+
+Ventas de videojuegos crecen a triple dígito en la cuarentena. (2020, May 4). Retrieved April 29, 2021, from https://www.portafolio.co/negocios/ventas-de-videojuegos-crecen-a-triple-digito-en-la-cuarentena-540506
+
+<style>
+body {
+  color: #565656;
+  font-family: Helvetica;
+  background-color: #F5F5F5;
+}
+#header {
+  color: #0A4063;
+  font-family: Helvetica;
+  opacity: 1.3;
+  font-size: 30px;
+}
+</style>
+
+
+
+
+
