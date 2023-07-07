@@ -1227,7 +1227,7 @@ elegidos %<>% filter(año_alta%in%c("2016","2017","2018","2019","2020","2021","2
 Aplicando todos estos filtros para la selección de prospectos pudimos reducir la lista a 57 clientes prospectos. Con esta selección de clientes buscamos expandir el negocio, duplicando el portafolio de clientes, hacia un mercado más selecto y con un seguro crecimiento con base al análisis tanto interno como externo realizado para A&S dentro de los 3 años planteados.  
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-gmaps_key<-'AIzaSyDBnp7Xch3LGWkWemStA20VlUCLGs7_7oQ'
+gmaps_key<-'API KEY'
 register_google(key = gmaps_key) 
 prospectos_elegidos<- elegidos %>%select(lat,long,actividad,per_ocu)
 lat <- as.list(prospectos_elegidos$lat)
