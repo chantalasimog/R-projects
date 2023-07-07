@@ -1,0 +1,592 @@
+---
+title: "Codigo Evidencia"
+author: "Chantal Aimeé Simó García A00827554"
+date: "11/2/2021"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    number_sections: TRUE
+    toc_float:
+      smooth_scroll: TRUE
+      collapsed: FALSE
+editor_options: 
+  chunk_output_type: inline
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(corrplot)
+library(ggcorrplot)
+library(factoextra)
+library(readxl)
+library(dplyr)
+library(openxlsx)
+library(tidyverse)
+library(InformationValue)
+library(caret)
+library(skimr)
+```
+
+# Alcance 
+La situación problema que se aborda para esta unidad formativa busca poder identificar los patrones de asociación de los clientes de tarjetas de crédito y predecir su situación de pago. Los bancos actúan como la estructura que permite la transferencia de recursos entre los diferentes actores de la sociedad. Estos promueven el uso de tarjetas de crédito a través de incentivos como convenios con aerolíneas y tiendas departamentales, compras realizadas, intercambio de puntos por productos. Este incentivo para el uso de tarjeta de créditos ante la sociedad es para la ganancia de utilidades mediante intereses en la prestación de dinero a través de las tarjetas de crédito. 
+
+El objetivo de este proyecto es poder estudiar y analizar los patrones subyacentes de los datos del cliente y sus usos de tarjeta de crédito que indican las características del mismo, sus indicadores financieros y las condiciones de pago de la tarjeta determinan el uso de tarjetas de crédito. Con esta información se busca determinar y predecir la situación de pago de los clientes a partir de un modelo que incorpore variables de comportamiento en el uso de la tarjeta de crédito. Para poder cumplir con el objetivo, hasta el momento, se ha llevado a cabo una serie de técnicas y análisis tales como análisis de conglomerados, análisis de varianza, clasificación discriminante y regresiones logísticas. 
+
+# Identificación de clúster
+El análisis de clúster o análisis de conglomerados se considera un conjunto de técnicas multivariantes utilizadas para clasificar a un conjunto de individuos en grupos homogéneos en función de alguna característica encontrada. Este análisis surge ante la necesidad de diseñar una estrategia que permita definir grupos de objetos homogéneos que en este caso serían los clientes.
+
+El objetivo del negocio es utilizar el análisis de clúster para poder segmentar el mercado de los clientes que contamos con el propósito de formar grupos o conglomerados de estos individuos similares entre sí, pero diferentes a otros agrupados en grupos diferentes. Al identificar estos grupos se pueden desarrollar estrategias para crear el incentivo en el uso de tarjetas de créditos. Además, se planea que a cada grupo se le aplicaría una estrategia de atracción diferente dado a que cada uno cuenta con características e indicadores financieros diferentes con el fin de poder crear el incentivo de uso según sus comportamientos, características y usos. 
+
+## Método identificación de clústers
+Como se mencionó anteriormente, el análisis de clúster surge ante la necesidad de diseñar una estrategia que permita definir grupos de objetos homogéneos. Con esto en mente, considero que el análisis de clúster es el indicado para este tipo situaciones debido a que nos ayudaría bastante a la hora de realizar las segmentaciones de los clientes para dirigir una publicidad acertada a dicho segmento y encontrar nichos de mercados para la venta de productos. El método de análisis adecuado entre el jerárquico y no jerárquico (K-medias) se considera que en base a los datos obtenidos la mejor opción es la de K-medias. La decisión fue tomada en base a las ventajas que trae este método como lo es su facilidad, legibilidad y puntualidad al arrojar los resultados para un gran volumen de datos no etiquetados.
+
+## Conglomerados
+El análisis de clúster es el indicado para este tipo situaciones debido a que nos ayudaría bastante a la hora de realizar las segmentaciones de los clientes para dirigir una publicidad acertada a dicho segmento y encontrar nichos de mercados para la venta de productos. El método de análisis adecuado entre el jerárquico y no jerárquico (K-medias) se considera que en base a los datos obtenidos la mejor opción es la de K-medias. La decisión fue tomada en base a las ventajas que trae este método como lo es su facilidad, legibilidad y puntualidad al arrojar los resultados para un gran volumen de datos no etiquetados.
+
+## Desarrollo del análisis Cluster
+```{r cars, include=FALSE}
+data<- read.xlsx("DATOS.xlsx")
+```
+
+```{r include=FALSE}
+#Cambio de nombre de los campos 
+data2 <- data
+names(data2)<- c('CLIENTE', 'SALDO_MENSUAL','SALDO_ANUAL', 'COMPRAS_AÑO','COMPRAS_UNICAS','COMPRAS_PLAZOS','DISP_EFECTIVO','PORCENTAJE_MESES_UNACOMPRA','PORCENTAJE_COMPRASUNICAS','FREC_DISOPOSICION','PROM_COMPRASPOR_TRANSACCION', 'PROM_DISPOSCION_EFECTIVO','COMPRASPOR_TRANSACCION','LIMITE_CREDITO','PAGOS_DISMMINUCION_SALDO','TOTAL_PAGOSMINIMOS','PORCENTAJE_MESES_PAGOTOTAL','ANTIGUEDAD_CLIENTE0','NSE','EDAD','ESTATUS_MAR')
+```
+
+Para realizar el análisis de conglomerado primero se clasificaron las variables de la base de datos de la siguiente formas: variables que describen el perfil de la persona, variables que muestran patrones de uso de la tarjeta de crédito y variables que muestran los indicadores financieros. Su distribución quedó de la siguiente forma: 
+
+- **Variables del perfil**: Antigüedad del cliente, Nivel socioeconómico, Edad, Estatus marital 
+- **Variables de patrones de tarjeta de crédito**: Compras al año, Compras únicas, Compras a plazos, Porcentaje de meses de una compra, Porcentaje de compras únicas, Compras por transacciones, Disposición de efectivo, Frecuencia de disposición de efectivo y Promedio de disposición de efectivo
+- **Variables de indicadores financieros**: Saldo mensual, Saldo anual, Pago de disminución de saldo, Total de pagos mínimos, Porcentaje de meses de pago total, Límite de crédito, Promedio de compras por transacción
+
+
+Con las variables distribuidas se proseguió a utilizar para el análisis las variables de patrón de tarjeta de crédito y de estas se elegirán cuatro que tengan algún aspecto en común entre ellas. Para identificar estas cuatro variables realizamos un resumen estadístico de todas las variables para ver cuales son los factores que tienen en común. 
+```{r}
+patrones <- data2[,c('COMPRAS_AÑO','COMPRAS_UNICAS','COMPRAS_PLAZOS','PORCENTAJE_MESES_UNACOMPRA','PORCENTAJE_COMPRASUNICAS', 'COMPRASPOR_TRANSACCION','DISP_EFECTIVO','FREC_DISOPOSICION',  'PROM_DISPOSCION_EFECTIVO')]
+skim(patrones)
+```
+
+Como resultado de este análisis decidimos analizar las siguientes cuatro variables: Compras únicas, Compras a plazos, Compras por transacción y Disposición de efectivo. Con estas cuatro variables mencionadas seguimos a analizarlas individualmente verificando que tengan un tipo de datos correcto, que no haya duplicados o nulos.
+
+Además, también realizamos un histogramas más grande para ver su distribución y un scatter plot donde se pueda ver su relación de datos con la variable descriptiva del perfil del cliente de antigüedad del cliente.
+Dado al análisis realizado a las variables de patrones de tarjeta de crédito considero que estas cuatro variables son las indicadas para realizar el análisis de clúster debido a las siguiente observaciones:
+
+### Gráficos 
+```{r}
+hist(x = data2$COMPRAS_PLAZOS)
+hist(x = data2$COMPRAS_UNICAS)
+hist(x = data2$COMPRASPOR_TRANSACCION)
+hist(x = data2$DISP_EFECTIVO)
+```
+
+```{r}
+ggplot(data2, aes(x=ANTIGUEDAD_CLIENTE0, y=COMPRAS_UNICAS)) + geom_point()
+ggplot(data2, aes(x=ANTIGUEDAD_CLIENTE0, y=COMPRAS_AÑO)) + geom_point()
+ggplot(data2, aes(x=ANTIGUEDAD_CLIENTE0, y=COMPRASPOR_TRANSACCION)) + geom_point()
+ggplot(data2, aes(x=ANTIGUEDAD_CLIENTE0, y=DISP_EFECTIVO)) + geom_point()
+```
+
+Dado al análisis realizado a las variables de patrones de tarjeta de crédito considero que estas cuatro variables son las indicadas para realizar el análisis de clúster debido a las siguiente observaciones:
+
+- Todas las variables a simple vista tuvieron un sesgo a la derecha significando un sesgo positivo.
+- Todas las variables en su histograma mostraron una distribución mayor cuando es cercano a 0.  
+- Al analizar su relación con variables descriptivas del cliente, en este caso con la antigüedad del cliente, todas presentaron el mismo resultado que mientras mayor la antigüedad mayor sus compras anuales, únicas, por transacción y disposición de efectivo. 
+
+Con estos patrones reconocidos después de los análisis de estas cuatro variables, se prosiguió a realizar el análisis de conglomerados por el método jerárquico y el método no jerárquico (k-medias). 
+
+### Desarrollo por K-Medias:
+K-means es un algoritmo de clasificación no supervisada que agrupa objetos en k grupos basándose en sus características. El agrupamiento se realiza minimizando la suma de distancias entre cada objeto y el centroide de su grupo o clúster. Se utiliza cuando tenemos un montón de datos sin etiquetar. El objetivo de este algoritmo es el de encontrar “K” grupos (clusters) entre los datos crudos. 
+
+```{r include=FALSE}
+D1 <- data2[,c('COMPRAS_PLAZOS', 'COMPRAS_UNICAS', 'DISP_EFECTIVO', 'COMPRASPOR_TRANSACCION')]
+D1_est <- scale(D1)
+colSums(is.na(D1_est))
+```
+
+```{r include=FALSE}
+# Metodo jerarquico
+dendogram <- dist(D1_est, method = "euclidean")
+HC <- hcut(dendogram, hc_method = "ward.D")
+objeto <- hclust(dendogram, method = "ward.D" )
+plot(objeto)
+HC <- hcut(dendogram, k=4, hc_method = "ward.D")
+data2$ClusterHC<-HC$cluster
+```
+
+### Gráfico K-Medias
+El método del codo analiza el porcentaje de varianza explicado como una función del número de conglomerados: se debe elegir un número de conglomerados para que la adición del otro conglomerado no proporcione un modelo mucho mejor de los datos. Como resultado podemos ver en la gráfica  que el número de clusters óptimo son cuatro. Esto es debido a que se observa que en el 4 cambia drásticamente el comportamiento de la gráfica.
+
+```{r}
+fviz_nbclust(D1_est, kmeans, method = "wss")
+```
+
+```{r}
+set.seed(61) # para que cada que se corra se utilice el mismo punto inicial aleatorio
+KM <- kmeans(D1_est, centers=4)
+```
+
+```{r}
+data2$ClusterKM <- KM$cluster
+```
+
+### Cúster Plot 
+1) COMPRAS_PLAZOS - COMPRAS_UNICAS
+2) COMPRAS_PLAZOS - DISP_EFECTIVO
+3) COMPRAS_PLAZOS - COMPRASPOR_TRANSACCION
+4) COMPRAS_UNICAS - DISP_EFECTIVO
+5) COMPRAS_UNICAS - COMPRASPOR_TRANSACCION
+6) DISP_EFECTIVO - COMPRASPOR_TRANSACCION
+
+```{r}
+# COMPRAS_PLAZOS - COMPRAS_UNICAS
+fviz_cluster(KM,
+             data=data2[,c("COMPRAS_PLAZOS","COMPRAS_UNICAS")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(150,200,15))+
+  scale_x_continuous(breaks = seq(150,200,20))
+```
+
+```{r}
+# COMPRAS_PLAZOS - DISP_EFECTIVO
+fviz_cluster(KM,
+             data=data2[,c("COMPRAS_PLAZOS","DISP_EFECTIVO")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(0,1.2,0.1))+
+  scale_x_continuous(breaks = seq(70,100,5))
+```
+
+```{r}
+# COMPRAS_PLAZOS - COMPRASPOR_TRANSACCION
+fviz_cluster(KM,
+             data=data2[,c("COMPRAS_PLAZOS","COMPRASPOR_TRANSACCION")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(0,1.2,0.1))+
+  scale_x_continuous(breaks = seq(70,100,5))
+```
+
+```{r}
+# COMPRAS_UNICAS - DISP_EFECTIVO
+fviz_cluster(KM,
+             data=data2[,c("COMPRAS_UNICAS","DISP_EFECTIVO")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(0,1.2,0.1))+
+  scale_x_continuous(breaks = seq(70,100,5))
+```
+
+```{r}
+# COMPRAS_UNICAS - COMPRASPOR_TRANSACCION
+fviz_cluster(KM,
+             data=data2[,c("COMPRAS_UNICAS","COMPRASPOR_TRANSACCION")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(0,1.2,0.1))+
+  scale_x_continuous(breaks = seq(70,100,5))
+```
+
+```{r}
+# COMPRAS_PLAZOS - DISP_EFECTIVO
+fviz_cluster(KM,
+             data=data2[,c("COMPRAS_PLAZOS","DISP_EFECTIVO")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(0,1.2,0.1))+
+  scale_x_continuous(breaks = seq(70,100,5))
+```
+
+```{r}
+# DISP_EFECTIVO - COMPRASPOR_TRANSACCION
+fviz_cluster(KM,
+             data=data2[,c("DISP_EFECTIVO","COMPRASPOR_TRANSACCION")],
+             geom="point",
+             stand = FALSE,
+             show_labels = FALSE)+
+  scale_y_continuous(breaks = seq(0,1.2,0.1))+
+  scale_x_continuous(breaks = seq(70,100,5))
+```
+
+**Tabla de interprestación Cluester Plots**  
+
+```{r echo=FALSE}
+#Tabla con datos de las n=1000 observaciones
+Tabla1<-data2 %>%
+  summarize("n"=n(), 
+            "Compras Unicas" = round(mean(COMPRAS_UNICAS),1), 
+            "Disposición de Efectivo" =round(mean(DISP_EFECTIVO),1),
+            "COMPRAS POR TRANSACCION"=round(mean(COMPRASPOR_TRANSACCION),1),
+            "COMPRAS A PLAZOS"=round(mean(COMPRAS_PLAZOS),1))
+            
+
+#Tabla por cada cluster
+Tabla2<-data2 %>%
+  group_by(ClusterKM) %>% 
+  summarize("n"=n(), 
+            "Compras Unicas" = round(mean(COMPRAS_UNICAS),1), 
+            "Disposición de Efectivo" =round(mean(DISP_EFECTIVO),1),
+            "COMPRAS POR TRANSACCION"=round(mean(COMPRASPOR_TRANSACCION),1),
+            "COMPRAS A PLAZOS"=round(mean(COMPRAS_PLAZOS),1))
+
+#Tabla agregada
+Tabla <-bind_rows(Tabla2, Tabla1)
+Tabla
+```
+
+### Hallazgos principales 
+Como pudimos ver en la gráfica de método del codo anterior, el número de clusters óptimo son 4. Esto es debido a que se observa que en el punto 4 cambia drásticamente el comportamiento de la gráfica. Una de las ventajas de este método es su facilidad, legibilidad y puntualidad al arrojar los resultados para un gran volumen de datos no etiquetados. Para este tipo de datos el método de k-medias es el adecuado para determinar el número indicado de clusters que son 4.
+
+Por otro lado, se puede observar que en la tabla de promedios que el clúster más grande visualizado en los clúster plot es el grupo 2 y el más pequeño es el 1. Se presentan clústers de distinto tamaño porque el número de personas con distinto patrón de comportamiento varía. Su visibilidad se puede observar en los gráficos comparativos donde se encuentra el mismo patrón donde hay un clúster más grande que las demás debido a las variables utilizadas.
+
+Cabe mencionar que las visualizaciones clúster no está tomando en cuenta las variables estandarizadas pero la tabla de promedio si, el cual nos da unos resultados e insights más precisos sobre el comportamientos de los diferentes grupos en las gráficas. 
+
+## Características de los grupos: 
+```{r include=FALSE}
+library("fastDummies")
+DatosD<-dummy_cols(data2[,c(2:23)]) 
+```
+
+```{r echo=FALSE}
+#Tabla con datos de las n=1000 observaciones
+Tabla1<-DatosD %>%
+  summarize("n"=n(), 
+           "Compras Unicas" = round(mean(COMPRAS_UNICAS),1), 
+            "Disposición de Efectivo" =round(mean(DISP_EFECTIVO),1),
+            "COMPRAS POR TRANSACCION"=round(mean(COMPRASPOR_TRANSACCION),1),
+            "COMPRAS POR AÑO"=round(mean(COMPRAS_AÑO),1),
+            "Saldo Mensual" = round(mean(SALDO_MENSUAL),1), 
+            "Saldo Anual" =round(mean(SALDO_ANUAL),1),
+            "Compras Plazos"=round(mean(COMPRAS_PLAZOS),1),
+            "% meses 1 compra" = round(mean(PORCENTAJE_MESES_UNACOMPRA),1), 
+            "$ meses compras únicas" =round(mean(PORCENTAJE_COMPRASUNICAS),1),
+            "Frecuencia de disposición"=round(mean(FREC_DISOPOSICION),1),
+            "% Disposición De efectivo"=round(mean(PROM_DISPOSCION_EFECTIVO),1), 
+            "Límite de Crédito" = round(mean(LIMITE_CREDITO),1), 
+            "Pagos por disminución de saldo" =round(mean(PAGOS_DISMMINUCION_SALDO),1),
+            "Total de pagos mínimos"=round(mean(TOTAL_PAGOSMINIMOS),1),
+            "% de meses pago total"=round(mean(PORCENTAJE_MESES_PAGOTOTAL),1), 
+            "Antigüedad de Cliente" = round(mean(ANTIGUEDAD_CLIENTE0),1), 
+            "Edad" =round(mean(EDAD),1))
+
+#Tabla por cada cluster
+Tabla2<-DatosD %>%
+  group_by(ClusterKM) %>% 
+  summarize("n"=n(), 
+            "Compras Unicas" = round(mean(COMPRAS_UNICAS),1), 
+            "Disposición de Efectivo" =round(mean(DISP_EFECTIVO),1),
+            "COMPRAS POR TRANSACCION"=round(mean(COMPRASPOR_TRANSACCION),1),
+            "COMPRAS POR AÑO"=round(mean(COMPRAS_AÑO),1),
+            "Saldo Mensual" = round(mean(SALDO_MENSUAL),1), 
+            "Saldo Anual" =round(mean(SALDO_ANUAL),1),
+            "Compras Plazos"=round(mean(COMPRAS_PLAZOS),1),
+            "% meses 1 compra" = round(mean(PORCENTAJE_MESES_UNACOMPRA),1), 
+            "$ meses compras únicas" =round(mean(PORCENTAJE_COMPRASUNICAS),1),
+            "Frecuencia de disposición"=round(mean(FREC_DISOPOSICION),1),
+            "% Disposición De efectivo"=round(mean(PROM_DISPOSCION_EFECTIVO),1), 
+            "Límite de Crédito" = round(mean(LIMITE_CREDITO),1), 
+            "Pagos por disminución de saldo" =round(mean(PAGOS_DISMMINUCION_SALDO),1),
+            "Total de pagos mínimos"=round(mean(TOTAL_PAGOSMINIMOS),1),
+            "% de meses pago total"=round(mean(PORCENTAJE_MESES_PAGOTOTAL),1), 
+            "Antigüedad de Cliente" = round(mean(ANTIGUEDAD_CLIENTE0),1), 
+            "Edad" =round(mean(EDAD),1))
+           
+#Tabla agregada
+Tabla <-bind_rows(Tabla2, Tabla1)
+t(Tabla)
+```
+
+- **Grupo 1** (Clientes de compra mínima): Son usuarios con un perfil de 11.4 años de antigüedad y 40 años de edad. En sus patrones de uso de la tarjeta de crédito muestran que tienen gran cantidad de disposición de efectivo con 20,744 sin embargo, cuenta con las menores cantidades de compras únicas (1,251), menores compras por transacción (5) y menores compras a plazos (803). Por otro lado, sus indicadores financieros muestran que tienen un buen saldo mensual de 20,881 y buen límite de crédito con 37,657. Además estos son un grupo de clientes que un decente total de pagos de mínimos (8,147) y decente pagos para disminución del saldo (15,247)
+
+- **Grupo 2** (Clientes de compra frecuente): Son usuarios con un perfil de 12 años de antigüedad y 43 años de edad. En sus patrones de uso de la tarjeta de crédito muestran que son los compradores más grandes de todos los grupos con una cantidad de 26,570 compras únicas. Estos hacen mayormente compras por transacción (92.2) y compras a plazos (16,157). En cuanto a sus indicadores financieros muestran que tiene un buen saldo mensual de 19,701 y un gran límite de crédito de 52,945.  Además, podemos considerar que es un grupo que sí generan más y más grandes pagos para disminuir su saldo (38,554) y cumplen con sus pagos mínimos (11,033). 
+
+- **Grupo 3** (Clientes de compra habitual): Son usuarios con un perfil de 11.3 años de antigüedad y 40 años de edad. En sus patrones de uso de la tarjeta de crédito muestran que son los clientes tienen mayores disposición de efectivo de todos los grupos. También son decentes compradores con una cantidad de compras únicas de 4,196, compras por transacción (10) y compras a plazos (1,710). En cuanto a sus indicadores financieros muestran que tiene el saldo mensual más alto con 34,510 y un gran límite de crédito de 61,055.  Además, podemos considerar que es el grupo con los mayores pagos para disminuir su saldo (55,136) y mayor cumplimiento de pagos mínimos (13,511). 
+
+- **Grupo 4** (Clientes de compra ocasional): Son usuarios con un perfil de 11.7 años de antigüedad y 41 años de edad. En sus patrones de uso de la tarjeta de crédito muestran que tiene la menor disposición de efectivo con 1,544. A pesar de tener muy poca disposición de efectivo tienen decente cantidades de compras con 2,728 y de estas son unos de los grupo con mayor compras a plazos con 2,014. En cuanto a sus indicadores financieros muestran que tiene el menor saldo mensual de 6,549y un bajo límite de crédito de 24,714.  Además, podemos considerar que es un grupo más riesgoso debido que son los que tienen el los más bajos pagos para disminuir su saldo (7,122) y  más propensos a caer en moratoria por sus bajos pagos mínimos (4,077). 
+
+
+## Estrategias y Recomendaciones
+Ya teniendo una idea de cómo está segmentados nuestro clientes, podemos a proseguir a desarrollar estrategias para cada uno de los grupos para incrementar el buen uso de la tarjeta de crédito. 
+
+Para el grupo de compras frecuentes estos son un grupo de clientes que les gusta mucho comprar y cuentan con la capacidad para hacerlo. Una estrategia que puede interesarle a este grupo son beneficios los beneficios a través de un programa de lealtad donde se le ofrezcan beneficios exclusivos. De igual forma, se le puede aplicar una publicidad variada que implique un beneficio fijo al utilizar cierta tarjeta. 
+
+Para el grupo de compras habituales, estos son clientes que tienen buena racha de compra sin embargo es necesario mantenerlos usando la tarjeta. Al igual que los de compra frecuentes se le puede ofrecer algún programa de lealtad que promueva beneficios económicos como millas, puntos, lugares exclusivos.
+
+Para el grupo de compras ocasionales se le hacen ofertas de tarjetas que impliquen algún beneficio fijo. Este beneficio fijo aunque sea una o dos veces semanales ya nos indica que los usará la tarjeta cada semana. 
+
+Por último, para los clientes de compras mínimas se deben hacer ofertas que le atraiga a este grupo a seguir utilizando sus tarjetas de crédito. Para este segmento se le puede ofrecer publicidad enfocada en su necesidad y patrones de consumo para que estos utilicen la tarjeta en base a lo que necesiten. Cabe resaltar que sin importar los periodos de compras de los diferentes grupos, es de suma importancia que para reforzar un buen uso de la tarjeta de crédito, el cliente debe de pagar sus facturas en las fechas establecidas para no caer en moratorias.
+
+# Análisis de Clasificación
+Para esta segunda parte estaremos enfocados en el análisis de clasificación mediante técnicas de análisis supervisada tal como el análisis discriminante o la regresión logística. Este análisis de clasificación tiene el propósito de determinar la situación de pago de los clientes a partir de un modelo que incorpore variables de comportamiento en el uso de la tarjeta de crédito. 
+
+Como sabemos, los bancos son empresas privadas que justifican su existencia con la generación de cierto beneficio para los que participen en su propiedad. En el caso de las personas con tarjeta de crédito, a estas solo se otorga una luego de un análisis hecho por el banco donde se muestre una solvencia demostrable y un bajo nivel de endeudamiento, más que la antigüedad laboral o los ingresos. 
+
+El objetivo del negocio es poder encontrar cuales son esos clientes si pueden cubrir los compromisos financieros establecidos con el banco con el fin de otorgarles más tarjetas de crédito o venderles más productos y servicios. Mientras que al identificar los cliente que no pueden cumplir con sus compromisos financieros, esto serían catalogado como insolvente o de riesgo el cual lleva a poner una mala calificación en Score Crediticio que lleva a la falta de aprobación de crédito en los siguientes años.
+
+El negocio de otorgar a un cliente solvente una tarjeta de crédito, representa ganancias para el banco al cobrar tarifas de intercambio a los comerciantes, a través de recargos, tarifa de servicios, comisiones de penalización y cargos por intereses. El cliente ideal para las instituciones bancarias son los clientes con tarjetas de crédito que gasten más de lo que pueden pagar, pero no tanto que entren en incumplimiento de pago. Así pueden beneficiarse de apuntar a quienes son más propensos a tener fallas cognitivas a través de los intereses.
+
+## Método de clasificación 
+Nuestro objetivo es poder clasificar los clientes de manera que se pueda determinar cuando son solventes o insolventes. Para poder clasificar los clientes se utilizan los métodos de clasificación supervisada como lo son la regresión logística y el análisis discriminante. 
+
+Para determinar cual método de clasificación es lo ideal para abordar esta situación tenemos que tomar en cuenta como son las variables que tenemos. Dentro de nuestra base de datos vemos que las categorías están claramente separadas por lo que los parámetros estimados para el modelo de regresión logística serían inestables mientras que en el ADL no. Por otro lado tenemos que el número de observaciones es grande y la distribución de  las variables predictoras no están normalizadas por lo que en este punto la regresión logística es más estable que el ADL. También se estima que el ADL es mejor cuando tenemos más de 2 clases de respuesta, el cual no es nuestro caso.Con esta investigación, se determinó que el mejor método para abordar este caso de clasificación sería a través de la regresión logística. 
+
+Por lo general se resulta útil utilizar la regresión logística para los casos en los que se desea predecir la presencia o ausencia de una característica o resultado según los valores de un conjunto de predictores. En este caso la utilizaremos para clasificación de solvencia e insolvencia utilizando las variables predictoras y un criterio para determinar la solvencia. 
+
+## Desarrollo análisis clasificación 
+```{r include=FALSE}
+data2 <- data 
+names(data2)<- c('CLIENTE', 'SALDO_MENSUAL','SALDO_ANUAL', 'COMPRAS_AÑO','COMPRAS_UNICAS','COMPRAS_PLAZOS','DISP_EFECTIVO','PORCENTAJE_MESES_UNACOMPRA','PORCENTAJE_COMPRASUNICAS','FREC_DISOPOSICION','PROM_COMPRASPOR_TRANSACCION', 'DISPOSCION_EFECTIVO','COMPRASPOR_TRANSACCION','LIMITE_CREDITO','PAGOS_DISMMINUCION_SALDO','TOTAL_PAGOSMINIMOS','PORCENTAJE_MESES_PAGOTOTAL','ANTIGUEDAD_CLIENTE0','NSE','EDAD','ESTATUS_MAR')
+```
+Como primera parte para el desarrollo del modelo debemos identificar cuales son nuestra variables independiente y dependiente. Como no tenemos una variable dependiente que nos indique la solvencia de los clientes, esta será creada utilizando dos variables de la base de datos que nos indique un criterio conciso sobre cómo se calcula.  
+Con esto en mente, para calcular la solvencia se tomaron en cuenta mayormente son las siguientes: “Saldo mensual, Saldo anual, Pago de disminución de saldo, Total de pagos mínimos, Porcentaje de meses de pago total, Límite de crédito, Promedio de compras por transacción”
+
+
+Con estas variables ya identificadas, proseguiremos a analizar cada una de ellas e investigar qué representa cada una. Como resultado, elegimos las variables de “Pago de disminución de saldo” y “Total de pagos mínimos” debido a que son variables que describen los indicadores financieros que reflejan la gestión de la cuenta,  reflejan el historial de pagos y créditos realizados e indican que si el cliente no paga en disminución de saldo el pago mínimo requerido entra en moratoria por lo que deja de ser solvente.
+Con las dos variables definidas, se porpone el criterio de clasificación de la siguiente forma: 
+
+*“Si el pago por disminución de saldo es mayor o igual que el pago mínimo entonces el cliente es solvente, si no es insolvente.”*
+```{r message=FALSE, warning=FALSE}
+data3 <- data2 %>% mutate(SOLVENCIA = ifelse(PAGOS_DISMMINUCION_SALDO >= TOTAL_PAGOSMINIMOS, "Solvente","Insolvente"))
+
+data4 <- data3 %>%
+         mutate(SOLVENCIA_B = recode(SOLVENCIA,
+                                 "Insolvente"  = 0,
+                                 "Solvente" = 1))
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+DATA4 <- data4
+```
+
+### Creación del modelo 
+Ahora para el desarrollo del modelo, ya contamos con nuestra variables dependiente creada bajo el criterios de pagos mínimos y pagos por disminución de saldo. Para esto comenzamos desarrollando el modelo utilizando todas las variables de la base de datos, solamente excluyendo las variables utilizadas para crear la variable dependiente y las variables no tienen ningún significado como la del folio del cliente. 
+
+**Modelo con todas las variables**
+```{r}
+Todo <- glm(SOLVENCIA_B~SALDO_MENSUAL+SALDO_ANUAL+COMPRAS_AÑO+COMPRAS_UNICAS+COMPRAS_PLAZOS+DISP_EFECTIVO+
+              PORCENTAJE_MESES_UNACOMPRA+PORCENTAJE_COMPRASUNICAS+FREC_DISOPOSICION+
+              PROM_COMPRASPOR_TRANSACCION+DISPOSCION_EFECTIVO+COMPRASPOR_TRANSACCION+LIMITE_CREDITO+
+              PORCENTAJE_MESES_PAGOTOTAL+ANTIGUEDAD_CLIENTE0+EDAD,
+              data4,family = binomial(link = "logit"))
+summary(Todo)
+```
+
+Como resultado del modelo con todas las variables, obtuvimos variables con altos niveles de confianza y bajos niveles de confianza. Con esto en mente, se prosiguió a realizar una validación de variables donde establecemos que una variable bastantemente significativa tiene un alfa menor o igual a 0.05 (confianza del 95%) 
+
+Se revisaron las variables bajo la validación de su nivel de confianza y nos quedaron las siguientes: Saldo mensual, Saldo anual, Disposición de efectivo, Porcentaje de compras únicas, Promedio de compras por transacción, Límite de crédito, Porcentaje de meses pago total, Antigüedad del cliente y Edad del cliente. Con estas variables proseguimos a desarrollar las validaciones pero ahora con los métodos  “forward”, “backward” y “stepwise” la selección de variables.
+
+### Selección de variables por métodos  
+
+```{r message=FALSE, warning=FALSE}
+# Solo con la varible dependiente 
+RLog.Vacio<-glm(SOLVENCIA_B~1,data4,family = binomial(link = "logit"))
+
+# Modelo con Variables significante 
+RLog.Completo<-glm(SOLVENCIA_B~SALDO_MENSUAL+SALDO_ANUAL+DISP_EFECTIVO+ PORCENTAJE_COMPRASUNICAS+ 
+              PROM_COMPRASPOR_TRANSACCION+LIMITE_CREDITO+PORCENTAJE_MESES_PAGOTOTAL+ANTIGUEDAD_CLIENTE0+EDAD,
+              data4,family = binomial(link = "logit"))
+```
+
+**Método Foward**
+```{r message=FALSE, warning=FALSE}
+RLog.Forward<- 
+step(RLog.Vacio,
+scope=list(lower=RLog.Vacio,
+upper=RLog.Completo),
+direction ="forward")
+```
+
+**Método Backward**
+```{r message=FALSE, warning=FALSE}
+RLog.Backward<- 
+step(RLog.Completo,
+scope=list(lower=RLog.Vacio,
+upper=RLog.Completo),
+direction ="backward")
+```
+
+**Método Stepwise**
+```{r message=FALSE, warning=FALSE}
+RLog.Stepwise<- 
+step(RLog.Vacio,
+scope=list(lower=RLog.Vacio,
+upper=RLog.Completo),
+direction ="both")
+```
+
+Luego de realizar la validación de variables mediante estos métodos, podemos ver que cada una nos indico las mejores variables para realizar un modelo significativo y  preciso. Tomando en cuenta estas variables se realizaron varias pruebas con cada método para identificar cuál modelo nos brinda los mejores valores para la predicción de la solvencia de los clientes. 
+
+Variables: 
+
+**Método Foward**
+
+- Saldo mensual 
+- Antigüedad del cliente 
+- Límite de crédito 
+- Prom compras por transa. 
+
+**Método Backward**
+
+- Saldo mensual 
+- % de compras únicas
+- Límite de crédito 
+- % mese de pago total
+- Saldo anual 
+
+**Método Stepwise**
+
+- Saldo mensual 
+- % de compras únicas
+- Límite de crédito 
+- % mese de pago total
+- Edad 
+
+### Modelo Final 
+Como resultado final se utilizaron las variables propuestas para el desarrollo del modelo y el modelo con los mejores resultados fue utilizando las variables propuestas por el método stepwise. Dentro de sus resultados obtuvimos una mediana de 0.1 por lo que el modelo no se subestima, ni sobreestima de manera drástica. Un null deviance de 6227, un residual deviance de 6317 y un AIC de 632 donde mientras menor el AIC, mejor.
+```{r}
+prueba1 <-glm(SOLVENCIA_B~PORCENTAJE_COMPRASUNICAS+LIMITE_CREDITO+PORCENTAJE_MESES_PAGOTOTAL+SALDO_MENSUAL
+              +EDAD,data4,family = binomial(link = "logit"))
+summary(prueba1)
+```
+
+```{r message=FALSE, warning=FALSE}
+Estadistico<-with(prueba1, null.deviance - deviance)
+print("Estadistico:")
+Estadistico
+```
+
+```{r message=FALSE, warning=FALSE}
+ValorP<-with(prueba1, pchisq(null.deviance - deviance, df.null-df.residual, lower.tail = FALSE))
+print("ValorP:")
+ValorP
+```
+
+### Punto de corte óptimo
+
+El punto de corte óptimo es aquel que maximiza el ratio de verdaderos positivos (sensibilidad), al mismo tiempo minimiza el ratio de falsos positivos (1−especificidad). Es llegar a un compromiso de maximización de ambos parámetros, teniendo en cuenta que aumentar uno significa disminuir el otro. En otras palabras, es donde menos errores cometemos a la hora de hacer el diagnóstico y donde menos etiquetamos de forma incorrecta. En nuestro caso obtuvimos un punto de corte óptimo de 0.7099. La interpretación de este punto establece que: “A partir de la probabilidad estimada de 0.7099 cualquier cliente será considerado como solvente, de lo contrario será insolvente.” Usando el punto de corte óptimo obtenemos que 5,887 clientes son solventes y 2,113 no lo son. 
+
+```{r}
+#PUNTO DE CORTE PRUEBA 
+DATA4$predict<-prueba1$fitted.values
+optCutOff2 <- optimalCutoff(DATA4$SOLVENCIA_B,DATA4$predict, optimiseFor="Both")
+print("PUNTO DE CORTE:")
+optCutOff2
+```
+
+### Curva ROC y Area AUC
+```{r message=FALSE, warning=FALSE}
+library(ROCR)
+library(pROC)
+pred = predict(prueba1,DATA4,type="response")
+rocobj <- roc(DATA4$SOLVENCIA_B, pred)
+exp(coefficients(prueba1)) # Coefficientes de la curva 
+auc(data4$SOLVENCIA_B, pred)# Area AUC:
+```
+
+Aquí podemos ver una gráfica que muestra el punto de corte, la curva ROC y su área AUC. La Curva ROC muestra el rendimiento del modelo entre los distintos umbrales de clasificación. Aquí observamos que el modelo tiene una medida de separación adecuada y es capaz de distinguir entre clase positiva y clase negativa. El área AUC mide el área bidimensional completa que se encuentra debajo de la curva ROC. Nuestro AUC es 0.86 por lo que podemos deducir que el 86% de las predicciones son correctas. Entre más alto el % mejor.
+```{r}
+plot.roc(rocobj,print.auc=T,print.thres = "best",
+          col="blue",xlab="1-ESpecificidad",ylab="Sensibilidad")
+```
+
+## Tabla de Clasificación
+Ahora con nuestro modelo realizado, utilizaremos el mismo para ver los porcentajes de la clasificación de los clientes solventes e insolventes, para cada nivel socioeconómico y para cada estado marital. Como resultado se obtuvo lo siguiente:
+
+**Por Nivel Socio económico**
+```{r echo=FALSE}
+solvencia_NSE <- table(data3$NSE,data3$SOLVENCIA)
+prop.table(solvencia_NSE)*100  #Tabla entera suma 100
+prop.table(solvencia_NSE,1)*100 #Tabla por fila 
+```
+En la primera tabla podemos ver los porcentajes de clientes solventes e insolventes  en base al total. Mientras en la segunda tabla podemos ver el porcentaje de clientes solventes e insolventes en base a la fila. 
+
+**Por Estatus Marital**
+```{r}
+solvencia_ESTATUS_MAR<- table(data3$ESTATUS_MAR,data3$SOLVENCIA)
+prop.table(solvencia_ESTATUS_MAR)*100 #Tabla entera suma 100
+prop.table(solvencia_ESTATUS_MAR,1)*100 #Tabla por fila
+```
+De igual forma pero ahora por estatus marital, en la primera tabla podemos ver los porcentajes de clientes solventes e insolventes  en base al total. Mientras en la segunda tabla podemos ver el porcentaje de clientes solventes e insolventes en base a la fila.
+
+### Matriz de Confusión
+La matriz de confusión es una herramienta muy útil para valorar cómo de bueno es un modelo de clasificación basado en aprendizaje automático. En particular, sirve para mostrar de forma explícita cuándo una clase es confundida con otra, lo cual nos permite trabajar de forma separada con distintos tipos de error.
+
+Utilizando la matriz de confusión, evaluamos la capacidad que tiene el modelo realizado para predecir tanto a los clientes insolventes como a los clientes solventes. 
+
+```{r warning=FALSE}
+# MATRIZ CONFUSIÓN ORIGINAL 
+DATA4$predict<-predict(prueba1, DATA4, type = "response")
+DATA4$predictC<-ifelse(DATA4$predict >= optCutOff2, yes = 1, no = 0)
+DATA4$predictC=as.factor(DATA4$predictC)
+DATA4$SOLVENCIA_B=as.factor(DATA4$SOLVENCIA_B)
+matriz<-confusionMatrix(DATA4$predictC,DATA4$SOLVENCIA_B,mode="prec_recall")
+matriz
+```
+
+**Resultados Generales:**
+
+- Accuracy = 0.7801
+- P-Value = 2.2e-16
+- Kappa = 0.5075
+- Precision = 0.5572
+- Balanced accuracy = 0.7914
+
+El modelo de regresión logística cuenta con 6,241 resultados verdaderos (Suma de VP +VN). Estos son los resultados de los clientes que sí son solventes e insolventes y que la predicción también concuerda. Por otro lado, este mismo modelo cuenta con 1,759 valores erróneos (Suma de FP +FN). Estos son los resultados de los clientes que sí son solventes e insolventes pero que la predicción fue errónea. Todos estos resultados nos dan una precisión del 78% para predecir, un Kappa de 50% que mide qué tan buenas son sus predicciones en comparación con asignaciones aleatorias y un Mcnemar’s Test P-Value bien bajito que indica la significancia del modelo.
+
+
+## Veracidad del modelo 
+
+Como podemos ver a través de los resultados obtenidos, podemos decir que este modelo es lo suficientemente adecuado y útil para la identificar y clasificar los clientes solventes e insolventes por las siguientes razones:
+
+- Podemos decir que este modelo fue unos de los mejores modelos encontrados luego de la validación y selección de variables por los diferentes métodos. Esta mostró un estadístico significativo y un valor p que nos demuestra confianza. 
+- Como tal este modelo presenta buen grado de confianza (mayor al 99%) y es lo suficientemente preciso (aproximadamente 80% de exactitud) para identificar cuales son los clientes solvente e insolvente. 
+- Agregando nuestros resultado del punto de corte óptimo, tenemos una probabilidad estimada de 71% donde cualquier cliente será considerado como solvente, de lo contrario será insolvente, el cual es un resultado bueno.
+- Además, en los resultados de nuestra Curva ROC en este modelo se observa que el tiene una medida de separación adecuada y es capaz de distinguir entre clase positiva y clase negativa.
+- Por otro lado en su área AUC, obtuvimos un 0.86 en lo que se traduce que el 86% de las predicciones son correctas. Se considera una área AUC entre 0.75-0.9 una área buena. 
+
+Además, dado a los resultados obtenidos y las razones mencionadaspodemos decir que igualmente este modelo es lo suficientemente bueno y podría funcionar satisfactoriamente para nuevos datos que se introduzcan en la base de datos.  
+
+## Estrategias y recomendaciones
+El uso de tarjetas de crédito se ha vuelto un mecanismo muy útil y altamente usado para poder hacer frente a diversas compras y transacciones cotidianas.  Sin embargo, al igual que puede ayudar a los consumidores en estas operaciones, también presenta un alto riesgo de que, si no se sabe controlar su uso, se pueda entrar en un elevado endeudamiento que finalmente, suponga un problema para la salud de las finanzas de la persona.
+
+Como se estableció anteriormente, un cliente solvente es un cliente que sí puede hacer frente a sus obligaciones financieras. A los bancos les gusta un cliente solvente debido a que si tiene la capacidad de poder pagar los montos de intereses más el préstamo realizado. Cuando un cliente es insolvente este puede llegar a ser un riesgo debido a que ya ese cliente no tiene la capacidad de pagar el monto que debe el cual no es bueno para los bancos. 
+Con esto en mente se proponen estrategias y recomendaciones para que los clientes realicen un buen uso de la tarjeta de crédito y para que el área de gestión del banco realice un monitoreo del buen uso. Comenzando con las recomendaciones de monitoreo se requiere de algún modelo o herramienta que pueda rastrear los cambios en los reportes de crédito y que la misma pueda crear su alerta de cambio. Un cliente solvente se puede volver insolvente por lo que es necesario poder estar alerta mediante los modelo predictivos que indiquen los clientes que son propensos a caer en insolvencia.
+
+Por otro lado en recomendaciones para el usuarios, siempre es bueno recomendarle que paguen a tiempo las facturas de su banco para evitar intereses por atrasos. Cabe resaltar que los pagos a realizar no tienen que ser al 100% sino que se pueda ir pagando los pagos mínimos hasta completar la factura final. Otra recomendación es que el mismo cliente establezca sus propias fechas límites ya que esto le permite controlar de mejor manera sus gastos y así, poder pagar las cuotas en el  tiempo que la persona fije. De igual forma, es esencial que el cliente sepa que nunca acepte más de lo que pueda pagar, siempre debe tener en cuenta sus posibilidades de pago. Por último, no pierda nunca de vista el monto, cuando haga sus compras o transacciones a través de este medio, no debe perder nunca de vista el monto que lleva registrado en su cuenta, para que pueda controlar mejor sus finanzas.
+
+# Conclusiones
+Para concluir, considero que si pudimos abordar nuestra situación problema de poder identificar los patrones de asociación de los clientes de tarjetas de crédito y predecir su situación de pago mediante las técnicas y análisis realizado a lo largo del reporte. Cada metodología de análisis contribuye un factor muy importante para poder desarrollar una solución ante la situación problema y al mismo tiempo apoyar los objetivos del negocio que sostiene la industria bancaria. 
+
+Las técnicas y análisis realizados tanto para la conglomeraciones como las clasificación fueron propuestas dada a la facilidad en su uso, legibilidad en sus interpretaciones y flexibilidad ante los datos obtenidos.  Cada metodología de análisis tiene sus ventajas, por ejemplo la regresión logística es una técnica muy empleada debido a su eficacia y simplicidad y resultados son altamente interpretables. Para esta metodología de clasificación supervisada no es necesario disponer de grandes recursos computacionales, tanto en entrenamiento como en ejecución. Por otro lado el análisis de K-medias para la creación de segmentos o conglomerados destaca por la metodología del algoritmo en su facilidad, legibilidad y puntualidad al arrojar los resultados para un gran volumen de datos no etiquetados. 
+
+Con estos estos análisis y sus resultados antes la problemática, se desarrollaron estrategias de crecimiento en el uso de tarjeta de crédito para los conglomerados y se crearon recomendaciones que promuevan un mejor uso de tarjeta de crédito para que tantos los cliente solvente e insolvente puedan manejar de manera adecuada sus finanzas y los banco en monitoreo de los mismo.  Estas recomendaciones y estrategias son basadas en los resultados de los análisis luego de estudiar y analizar los patrones de los datos del cliente y sus usos de tarjeta de crédito que indican las características del mismo, sus indicadores financieros y las condiciones de pago de la tarjeta determinan el uso de tarjetas de crédito.
+
+# Referencias
+
+- INTRODUCCIÓN AL ANÁLISIS CLUSTER. (n.d.). CEACes. Retrieved October 30, 2021, from https://www.uv.es/ceaces/multivari/cluster/CLUSTER2.htm
+- Universidad de Granada. (n.d.). Practica 8: MÉTODOS DE ANÁLISIS MULTIVARIANTE: ANÁLISIS CLÚSTER. Estadistica. Retrieved October 30, 2021, from http://wpd.ugr.es/~bioestad/guia-spss/practica-8/
+- Bloomberg. (2016, July 1). Así ganan dinero las empresas de tarjetas de crédito. El Financiero. Retrieved October 31, 2021, from https://www.elfinanciero.com.mx/economia/asi-ganan-dinero-las-empresas-de-tarjetas-de-credito/ 
+- Ferluga, G. (2019, October 22). Los clientes que los bancos no quieren ver ni en pintura. EL PAÍS. Retrieved October 31, 2021, from https://elpais.com/economia/2019/10/08/mis_finanzas/1570544924_078615.html 
+- IBM. (n.d.-b). Regresión Logística. Retrieved October 31, 2021, from https://www.ibm.com/docs/es/spss-statistics/SaaS?topic=regression-logistic
+- Rodríguez, D. (2018, July 1). La regresión logística. Analytics Lane. Retrieved November 1, 2021, from https://www.analyticslane.com/2018/07/23/la-regresion-logistica/
+- Editorial La República S.A.S. (2014, February 25). Ocho consejos para el buen uso de la tarjeta de crédito. Diario La República. Retrieved November 1, 2021, from https://www.larepublica.co/finanzas/ocho-consejos-para-el-buen-uso-de-la-tarjeta-de-credito-2103046
+
+
+
+
+
+
