@@ -1,0 +1,343 @@
+---
+title: "Evidencia 2- Analítica descriptiva "
+author: "Chantal Simó A00827554"
+date: "3/12/2021"
+output: html_document
+---
+
+```{r include=FALSE}
+library(dplyr)
+library(tidyverse)
+library (ggplot2)
+library(nycflights13)
+```
+```{r include=FALSE}
+data("flights")
+data("planes")
+data("airlines")
+data("airports")
+data("weather")
+```
+
+
+### Ejercicio Modelo Entidad-Relación
+Se ha solicitado hacer un estudio sobre la situación actual de la aerolínea American Airlines ya que se necesita revisar sus destinos, horarios y aviones con los que cuenta para hacer propuestas de aumento o reducción de vuelos por destino y horarios, así como la cantidad de aviones. 
+Lo primero que tenemos que hacer es conocer la base de datos del sistema administrativo del aeropuerto y para ello se explorara e identificara las variables que la forman y sus tipos.Se exploraran sus datos y se consultaran los campos necesitados en cada caso. 
+```{r eval=FALSE, include=FALSE}
+view(flights)
+view(planes)
+view(airlines)
+view(airports)
+view(weather)
+```
+
+#### 1) La aerolínea, el aeropuerto de origen y el aeropuerto destino de cada vuelo.
+Para comenzar, se seleccionó del data frames de flights los campos de aerolínea (carrier), origen (origin) y aeropuerto de destino (dest) con la formula de SELECT y se visualizó su data. Como se puede ver en la tabla, esta nos muestra los campos seleccionados mostrando las diferentes aerolineas, su origen y aeropuerto de destino a que se dirige. 
+```{r echo=FALSE}
+vuelos <- flights %>% select(carrier,origin, dest)
+vuelos
+```
+
+#### 2) Nombre de la aerolínea del punto anterior.
+Usando el mismo data frame creado con el punto anterior, se agregó con un LEFT-JOIN el nombre de la aerolinea a los carriers para mejor visualización y entendimiento de la tabla. 
+```{r echo=FALSE}
+vuelos1 <- vuelos %>% left_join(airlines,by="carrier") %>%
+   select(carrier,name,origin,dest)
+vuelos1
+```
+
+#### 3.1) Cantidad de vuelos por cada destino para identificar cuáles son los destinos más buscados.
+En este punto se crearon cuatro data frames diferente el cual dos de estos llamado "contar_vuelos1" están mostrando la cantidad de vuelos por destino para identificar cuáles son los destinos más buscados con el nombre del aeropuerto. Como se pueden ver en ambas tablas, estas dos muestran la cantidad de vuelos por cada destino. Para esto realizamos un conteo de vuelos hechos por destino con la función COUNT y adicional se hizo un ARRANGED para ordenar de forma descendente para visualizar cuales son los destinos con más cantidad de vuelos. Para adjuntar los nombre de los carriers se hizo un LEFT-JOIN para combinar del data frame de flights con el de airports y se seleccionaron los campos a mostrar.
+
+##### Data Frame: Contar_vuelos1
+```{r echo=FALSE}
+contar_vuelos1 <- flights %>% 
+  count(dest) %>%
+  arrange(desc(n))
+contar_vuelos1
+```
+```{r echo=FALSE}
+union1 <- contar_vuelos1 %>% left_join(airports, by =c("dest"="faa")) %>%
+  select(dest,name,n)
+union1
+```
+Resultados: Entre ellos están en el top 3 lo siguientes: En 1er lugar  está (ORD) Chicago Ohare Intl con 17283 unidades, En 2do esta (ATL) Hartsfield Jackson Atlanta Intl con 17215 unidades, en 3ro esta (LAX) Los Angeles Intl con 16174	unidades. En los últimos lugares esta (LGA) La Guardia y (LEX) Blue Grass con solo una unidad. 
+
+
+
+#### 3.2) Cantidad de vuelos por cada destino y carrier para identificar cuáles son los destinos más buscados.
+Los otros dos data frame llamado "contar_vuelos2"  es muy parecido al ultimo, solo que se muestra la cantidad de vuelos por destino y aerolínea junto el nombre de la aerolínea. Como se pueden ver en ambas tablas, estas dos muestran la cantidad de vuelos por destino y carrier. Al igual que el ejercicio anterior se realizó un conteo de vuelos hechos por destino con la función COUNT y adicional se hizo un ARRANGED para ordenar de forma descendente. Para adjuntar los nombre de los carriers se hizo un LEFT-JOIN para combinar del data frame de flights con el de airline y se seleccionaron los campos a mostrar. 
+
+##### Data Frame: Contar_vuelos2
+```{r echo=FALSE}
+contar_vuelos2 <- flights %>% 
+  count(dest, carrier) %>%
+  arrange(desc(n))
+contar_vuelos2
+```
+
+```{r echo=FALSE}
+union2 <- contar_vuelos2 %>% 
+  left_join(airlines,by="carrier") %>%
+  left_join(airports, by =c("dest"="faa")) %>%
+  select(carrier,name.x,dest,name.y,n) %>%
+  rename(carrier_name=name.x,dest_name=name.y)
+union2
+```
+Resultados: Entre ellos están en el top 3 lo siguientes: En 1er lugar está (DL) Delta Airline con destino a ATL con 10571 unidades, En 2do esta (US) US Airways Inc. con destino a CLT con 8632 unidades, en 3ro esta (AA) American Airlines con destino a DFW con 7257 unidades. 
+
+
+#### 4) Clave, nombre y destinos de cada aerolíneas que vuelan por la Madrugada, la  Mañana, la Tarde y por la Noche.
+En esta parte se desea saber cómo están agendados los vuelos por aerolínea y destino. Para esto, se utilizó la función MUTATE para crear un nuevo campo que menciona si un vuelos es por la madrugada (24 a 6), mañana (6 a 12), tarde (12 a 19) y noche (19 a 24) dependiendo de la hora de la hora de salida del vuelo (dep_time). Además de esto, se ha hecho un LEFT-JOIN para adjuntar el nombre de la aerolínea y el nombre del aeropuerto de destino y RENAME para renombrar los cambios añadidos por el LEFT-JOIN . Como resultado esto nos mostrará el horario del vuelo, su aerolínea con su nombre y el destino con su nombre.   
+```{r echo=FALSE}
+horarios_vuelos <- flights %>% mutate(clas_horario= ifelse(dep_time>=0000 & dep_time<600, "Madrugada", ifelse(dep_time>=600 & dep_time<1200,"Mañana", ifelse(dep_time>=1200 & dep_time<1900,"Tarde", ifelse(dep_time>=19000 & dep_time<24000,"Noche",NA))))) %>%
+  left_join(airlines,by="carrier") %>%
+  left_join(airports, by =c("dest"="faa")) %>%
+  select(clas_horario,carrier,name.x,dest,name.y) %>%
+  rename(carrier_name=name.x, dest_name=name.y)
+horarios_vuelos
+```
+
+
+#### 5) Cantidad de vuelos por aerolínea y destino que hay por la Mañana, Tarde, Noche y Madrugada.
+Usando el data frame creado para el punto anterior, ahora buscamos saber la cantidad de vuelos por aerolínea y destino que hay por la Mañana, Tarde, Noche y Madrugada.Para esto se realizó un GROUPBY para agrupar los campos que queremos mostrar, un COUNT para contar la cantidad de vuelos por aerolínea y destino, un ARRANGE para organizarse alfabéticamente los destinos y NA.OMIT para quitar todos los nulos. Como resultado nos muestra la aerolínea, el destino con el nombre del aeropuerto, el horario en que sale y la cantidad de vuelos. 
+Un ejemplo de este resultados puede ser el destino Albany que usa el carrier de ExpressJet Airlines. Este se repite tres veces dando saber que tiene tres horarios de vuelo siendo en la madrugada con 2 vuelos, en la mañana con 96 vuelos y en la tarde con 137 vuelos. 
+```{r echo=FALSE}
+group_vuelos <- horarios_vuelos %>% 
+  group_by(carrier_name,dest,dest_name,clas_horario) %>%
+  count(clas_horario) %>%
+  arrange(carrier_name) %>%
+  rename(cantidad_vuelos=n)%>%
+  na.omit()
+ group_vuelos 
+```
+
+#### 6) Destinos que vuela la aerolínea American Airlines Inc.-AA durante la madrugada.
+En este caso queremos saber los destinos que vuela la aerolínea American Airlines durante la madrugada. Se realizó algo similar al data frame creado en el punto anterior solo que ahora solo lo queremos saber para American Airlines. Usando las mismas funciones del ejercicio anterior, ahora se agrega un FILTER en donde especificamos que solo queremos ver la aerolínea AA (American Airlines) y que su horario sea en la madrugada sin nulos.
+
+Como resultados tenemos que AA tiene 4 destinos en la madrugada siendo Miami Intl con 507 vuelos, Dallas Fort Worth Intl con 217,Chicago Ohare Intl con 195 y Los Angeles Intl con solo 11 vuelos. La suma de todo esto son 930 vuelos en la madrugada en total. 
+```{r echo=FALSE}
+destinos_aa <- horarios_vuelos %>%
+  group_by(clas_horario,carrier,dest,dest_name) %>%
+  filter(carrier == "AA", clas_horario =="Madrugada", na.rm=TRUE) %>%
+   count(dest) %>%
+  arrange(desc(clas_horario)) %>%
+  rename(cantidad_vuelos = n) 
+view(destinos_aa)
+```
+
+#### 7) ¿Qué aviones utiliza la aerolínea AA? ¿Cuántos vuelos se han realizado con cada uno? 
+En este caso queremos ver los aviones que utiliza la aerolínea AA y cuántos vuelos se han realizado con cada uno. Para esto se realizó un LEFT-JOIN para juntar el data frame de plane con flights ya que plane es la que tiene información sobre los aviones utilizados. Se usó un FILTER para especificar que solo se quiere ver la aerolínea AA sin nulos, igualmente se usó un GROUPBY para agrupar los campos que queremos ver: aerolínea, tipo, motor y número de asientos. COUNT se utilizo para contar los tipos de aviones usados y ARRANGE para su organización. Como resultado nos muestra los campos de aerolínea, tipo, motor,  número de asientos y cantidad de aviones usados. 
+
+Respuesta: Sin contar los nulos, AA utiliza 171 aviones de 3 tipos: Fixed wing multi engine, Fixed wing single engine	y Rotorcraft. Al sumar el plane_count nos da un total de 10171 unidades. Los vuelos realizados por cada uno se visualizan en el campo de plane_count en donde podemos ver que el avión con más vuelos realizados es el N328AA con 393 vuelos. En 2do esta N338AA con 388 y en 3ro está N327AA con 387. 
+
+```{r echo=FALSE}
+avion_aa <- flights %>% 
+  left_join(planes,by="tailnum") %>%
+  filter(carrier == "AA", na.rm=TRUE) %>%
+  group_by(carrier,type,engine,seats) %>%
+  count(tailnum) %>%
+  arrange(desc(n)) %>%
+  rename(plane_count=n) %>%
+  na.omit()
+avion_aa
+```
+
+### Conclusiones y propuesta 
+Consideró que American Airlines tiene buena posición en la industria, pero creo que se puede mejorar. A comparación de sus principales competidores, Delta, United y Jetblue que son de los líderes en la industria, American Airlines debe emplear nuevas estrategias y tomar nuevas oportunidades para poder posicionarse mejor que ellos. Dentro de los hallazgos más relevantes encontrados, quiero resaltar que en los vuelos por horarios American Airlines no cuenta con mucha presencia. AA solo tiene aprox 38 vuelos independientemente de los horarios que tenga, mientras que su competencia tiene el doble o tres veces más que eso. Considero muy importante que AA aumente sus vuelos en todos los horarios pero principalmente en el horario de la noche (19-24 pm) ya que no cuenta con ninguna presencia esas horas. No tener vuelos en esa tanda afecta muchísimo al posicionamientos de AA por falta de opciones de horarios y destinos para el cliente. 
+
+Igualmente otra observación encontrada es que AA tiene el 3er y 4to lugar como aerolínea con más vuelos por destino (para los destinos de Miami y Dallas). Aunque no es una mala posición considero que puede mejorar y se puede abrir más opciones de destinos. 
+
+Al combinar estas dos observaciones considero que la propuesta sugerida para AA es que habrá más opciones de vuelos a destinos populares. Al hacer esto debe de abrir más horarios de vuelos para tener la ventaja competitiva de que el cliente pueda viajar a su destino en el horario que desee. Para que esto funcione AA necesita tener más aviones ya que solo cuenta con 171 segun el analisis (sin contar los nulos), debe de contratar más personas y mejorar su logística de vuelos. Considero esta propuesta será  muy efectiva ya que si queremos que AA mejore su posición competitiva, es hora que le brinde una propuesta de valor al cliente que es la presencia en el mercado mediante la variedad en opciones de vuelos, horarios y destinos populares.
+
+
+## Visualización de datos
+En los avances anteriores se han realizado diferentes análisis y ahora nos solicitan hacer visualizaciones de la aerolínea American Airlines para los ejecutivos con las siguientes características. 
+
+#### 1) Análisis de vuelos que tienen retraso en la partida y que también tienen retraso en la hora de llegada de American Airlines.
+Para este primer análisis mostramos qué tan relacionados están el retraso de partida y el retraso de llegada al sacar su proporción de retraso. En otras palabras, se busca saber cuál es la relación de igualdad que existe entre estas dos razones. Para esto seleccionamos con SELECT del data frame flights el campo de aerolínea, retraso de partida y el retraso de llegada y filtramos con FILTER  que solo queremos ver la información de la aerolínea de American Airlines, sin nulos y especifique que solo quiero ver el la llegada y la partirá mayores que 0 (ya que es el retraso). Luego, organizamos con de manera descendente el retraso de salida con ARRANGE para poder ver desde el mayor retraso hasta el menor. Por último, realizamos un nuevo campo con MUTATE en donde sacamos la proporción de retraso dividiendo el retraso de llegada entre el retraso de salida por 100.  
+```{r echo=FALSE}
+analisis1 <- flights %>% select(carrier,dep_delay,arr_delay) %>%
+  filter(carrier == "AA", dep_delay> 0, arr_delay > 0, na.rm=TRUE) %>%
+  arrange(desc(dep_delay)) %>%
+  mutate(proporcion_retraso = arr_delay/dep_delay*100) %>%
+  na.omit()
+analisis1
+```
+Como resultado nos muestra los campos de aerolínea, retraso de salida y retraso de llegada de forma descendente y su proporción de retraso. Al sacar la media de proporción de retraso nos da un  96.96% (97%). Esto significa que si la salida tiene retraso, hay un 97% de posibilidad que la llegada tenga un retraso similar. Por ejemplo, tenemos el caso de el vuelo con más retraso que tiene un retraso de 10 horas y 14 min de salida y de llegada 10 horas y 7 min. Su proporción de retraso es de un 99.3% significando que su hora tardada de salida es casi la misma que su hora tardada de llegada. En este ejemplo podemos ver que solo se diferencian por 7 min. Cuando su proporción sobrepasa los 100 significa que el retraso de llegada fue mayor que el retraso de salida. 
+
+```{r echo=FALSE, message=FALSE}
+bbb<- ggplot(analisis1, mapping = aes(x = dep_delay, y = arr_delay)) + 
+  geom_point(size =1, color="orange") +
+  geom_smooth(method=lm,color="#2A9D8F", se=FALSE) +
+  labs(title="Gráfica Scatter Plot: Vuelos de American Airlines y su relación de retrasos",subtitle = "Relación entre retrasos de salida y retrasos de llegada") +
+  theme_light()
+bbb
+```
+
+Al realizar la gráfica de dispersión sobre el análisis hecho podemos visualizar que cada punto naranja representa un vuelo con retraso de American Airlines en donde su mayoría está concentrado a principios del eje X y eje Y. Cuando los puntos están más concentrados a principios de estos ejes significa que la mayoría de sus vuelos tiene retrasos de pocas horas o cuestión de minutos. Mientras más se van alejando del eje X significa mayor retraso de salida o si se va alejando del eje Y significa mayor retraso de llegada.
+
+De igual forma, podemos ver que hay una línea que representa una línea de regresión que nos ayuda a visualizar la relación entre estas dos variables que pueden transformarse en una ecuación lineal para extrapolar la información. En este caso, esta línea está de forma creciente mostrando la relación que se explicó al sacar la proporción en el análisis. Al estar esta línea cerca de los puntos nos indica que su relación es verídica: mientras mayor sea su retraso de salida, mayor será su retraso de llegada.
+ 
+
+#### 2) Tendencia de la temperatura durante los primeros 15 días del mes de Enero en los vuelos que parten del aeropuerto “Newark, EWR”.
+Pues como el nombre nos especifica, ahora buscamos la tendencia de la temperatura durante los primeros 15 días del mes de Enero de los vuelos que salen de Newark. Para esto usamos el data frame de Weather en donde filtramos con FILTER que solo queremos que los que tiene origen en Newark (EWR), los días son menores a 16 (ya que son los primeros 15 días) y que sean solo del mes de enero. Luego con SELECT mostramos los campos de aeropuerto de origen, mes, día, temperatura y fecha y hora de cuando se registró esa temperatura. Con esta tabla hecha, ahora visualizamos la información recopilada con diferentes tipos de gráficas. 
+```{r echo=FALSE}
+temp_line <- weather %>%
+  filter(origin == "EWR", day < 16, month == 1) %>%
+  select(origin,month,day,temp,time_hour)
+temp_line
+```
+
+```{r echo=FALSE}
+ggplot(temp_line,aes(x=time_hour, y=temp)) +
+  geom_line(colour="#2A9D8F", linetype ="solid") +
+  labs(title="Gráfica lineal: Tendencia de temperatura de los primeros 15 días de Enero", subtitle = "Vuelos que parten del aeropuerto “Newark, EWR”") + theme_light()
+```
+
+Para mostrar la información, se realizó una gráfica de línea en donde podemos ver que la temperatura baja y sube cada cierto tiempo. Con esta observación, podría decir que el sube y baja de esta gráfica es debido a  que durante un día la temperatura tiene un máximo y un mínimo en donde la máxima sería durante el día y el mínimo durante la noche. Es por esto que la gráfica sube y baja,  debido a la temperatura máxima y mínima que se ve por dia. 
+
+Igualmente, a pesar de su sube y baja secuencial, podemos ver que el mismo sube y baja va creciendo a pasar los días. Ejemplo: a principios de la gráfica (principio del eje x) podemos ver que el mínimo es mucho más bajo que el mínimo  al final (finales del eje x) de la gráfica. Esto pasa igualmente en su temperatura máxima. 
+
+En general se calcularon los siguientes resultados: La temperatura máxima de estos primeros 15 días de Enero fue de 57.92 y la mínima fue de 24.08. El average o promedio de temperatura vista fue de 39.02
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = temp_line) +
+  geom_histogram(mapping =aes(x=temp), color="black", fill="lightblue") +
+  labs(title="Histograma: Tendencia de temperatura de los primeros 15 días de Enero", subtitle = "Visualización de la temperatura más frecuente") + theme_light()
+```
+
+Al igual que la gráfica anterior, en esta gráfica podemos ver la tendencia de la temperatura durante los primeros 15 días del mes de Enero solo que ahora es a través de una histograma. A diferencia de la gráfica lineal, este histograma es mucho más fácil de comprender y de observar ya que las barras nos dan un punto de vista diferentes y más simple. Con esta gráfica  podemos observar que el eje X son las temperatura y el eje Y son la cantidad en la que esta se repite durante los días. Podemos ver que las temperaturas más frecuentes rondan entre los 30 y 40 grados. La barra más alta, representa la temperatura más frecuente siendo esta específicamente de 38 grados.
+
+```{r echo=FALSE}
+ggplot(temp_line, mapping = aes(x = temp)) + 
+  geom_histogram(binwidth = 2, color = "black",fill = "lightblue") + 
+  facet_wrap(~day) +
+  labs(title="Histograma en Facetas: Tendencia de Temperatura por día", subtitle = "Visualización de la temperatura más frecuente") + 
+  theme_light()
+```
+
+Al utilizar facetas pude dividir el histograma anterior por días con el fin de visualizar cuál es la temperatura de cada día. Al igual que el histograma anterior, eje X son las temperatura y el eje Y son la cantidad en la que esta se repite. Dentro de los resultados obtenidos en la gráfica podemos ver que en el dia 1 prevalece la temp de 40 grados, dia 2 con 25 grados, dia 3 con 30 grados, día 4 con 35 grados, día 5 con 35 grados, día 6 con 35 grados, día 7 con 4o grados, día 8 con 4 grados, día 9 con 35 grados, día 10 con 40 grados, día 11 con 35 grados, día 12 con 45 grados, día 13 con 45 grados, día 14 con casi 50 grados y dia 15 con 40 grados. (Cabe resaltar que estos resultados son redondeados en unidades de 0 a 5). 
+
+#### 3) Top 10 aerolíneas con más vuelos que salieron de Nueva York en 2013 
+Para buscar las top 10 aerolíneas con más vuelos que salieron de Nueva York en 2013 usamos el data frame de Flights en donde usamos la función COUNT para contar la cantidad de vuelos por aerolínea, ARRANGE para organizarlos de manera descendente, LEFT-JOIN para agregar el nombre de cada aerolínea. Luego use SELECT para mostrar los campos de aerolínea con su nombre, y la cantidad de vuelos y por último HEAD para mostrar solo los top 10 con más cantidad de vuelos. Como resultados nos muestra las 10 aerolíneas con más vuelos y el nombre de la aerolínea correspondiente. Estos resultados se mostrarán en las gráficas siguientes. 
+```{r echo=FALSE}
+airline_flights <- flights %>% 
+  count(carrier) %>%
+  arrange(desc(n)) %>%
+  rename(cantidad_vuelos=n) %>%
+  left_join(airlines,by="carrier") %>%
+  select(carrier,name,cantidad_vuelos) %>%
+  rename(carrier_name=name) %>%
+  head(10)
+airline_flights
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+aaa<- ggplot(airline_flights,aes(x=carrier, y=cantidad_vuelos, fill=carrier_name)) +
+  geom_col(stat = "identity", position = "dodge") +
+  geom_text(aes(y=cantidad_vuelos, label=cantidad_vuelos), vjust=1.6,position = position_dodge(0.7),color="white", size=3.5) +
+  scale_fill_manual(values=c("#999999", "#FFA500", "#2A9D8F","#56B4E9","#E69F00", "#9ACD32", "#008000", "#69b3a2", "#6B8E23", "#20B2AA"))+ 
+  labs(title= "Gráfica de barra: Top 10 aerolíneas con más vuelos") +
+  theme_light()
+```
+
+Con esta gráfica de barra se presenta la información obtenida en la tabla anterior. Cada color representa una aerolínea diferente la cual está especificado en la columna derecha. Como podemos ver, El eje X son las aerolíneas mientras que el eje Y son la cantidad de vuelos realizado. Igualmente, cada barra muestra la cantidad de vuelos que realizó cada aerolínea. De los resultados obtenidos podemos ver que United Airlines es la aerolínea con más vuelos realizados con un total de 58,665 vuelos, luego le sigue Jetblue con 54,635 y en tercero ExpressJet Airlines con 54,173. American Airlines está posicionada como la número 5 con 32,729 vuelos en total. Considero que no es una posición mala para la aerolínea AA, pero creo que puede mejorar su posición. 
+
+```{r echo=FALSE}
+ggplot(airline_flights, aes(x="", y=cantidad_vuelos, fill=carrier_name)) +
+  geom_bar(stat="identity",color="white",width=0.5) +
+  coord_polar("y", start=0) +
+  geom_text(aes(label=carrier), position=position_stack(vjust=0.5),color="black",size=3) +
+  labs(title="Gráfico de Pie: Top 10 aerolíneas con más vuelos") +
+  theme_void()
+```
+
+Al igual que la última gráfica en barra, esta gráfica de pie nos muestran los mismo resultados solo que en proporciones diferentes debido a su forma. United Airlines (UA) sigue siendo la número uno con un porcentaje de 17.72% del total, Jetblue (B6) con 16.50% y ExpressJet Airlines (EV) con 16.36%. American Airlines (AA) en el puesto 5to, constituye el 9.88% del total. Estos porcentajes fueron calculados independientemente.  
+
+
+#### 4) Relación del data frame fligths con el data frame airports a través del campo 'destino' ¿Cómo logras esta relación?
+Para lograr esta relación primero usamos el data frame de Flights, luego hacemos un LEFT-JOIN en donde juntamos el data frame airports. En ambos data frame existe la columna de destino solo que tienen nombre diferentes. Debido a esto, especificamos dentro de la función que dest (del data frame de flights) es igual a faa (del data frame de airports). Juegos imprimimos la tabla y nos quedan juntos ambos data frame. 
+```{r echo=FALSE}
+relacion_fa <- flights %>% 
+  left_join(airports, by =c("dest"="faa"))
+relacion_fa
+```
+
+#### 5) Top 5 carriers con más vuelos por destino.
+Para ver los Top 5 aerolíneas con más vuelos por destino hacemos lo siguiente: usamos el data frame del ejercicio 4, usamos COUNT para contar los carriers y destinos, ARRANGE para organizarlos de manera descendiente, RENAME para cambiar el nombre de varios campos, LEFT_JOIN para adjuntar el nombre de los carriers, SELECT para elegir los campos que queremos mostrar y HEAD para enseñar solo el top 5. Como resultado, nos muestra una tabla en donde se visualiza la aerolínea con su nombre, destino con su nombre y la cantidad de vuelos realizados por cada aerolínea y destino.Sus resultados serán mostrados en las siguientes tres gráficas. 
+```{r echo=FALSE}
+top_5_vuelos_destinos <- relacion_fa %>% 
+  count(carrier,dest,name) %>%
+  arrange(desc(n)) %>%
+  rename(dest_name = name) %>%
+  rename(cantidad_vuelos = n) %>%
+  left_join(airlines,by="carrier") %>%
+  select(carrier,name,dest,dest_name,cantidad_vuelos) %>%
+  rename(carrier_name = name) %>%
+  head(5)
+top_5_vuelos_destinos 
+```
+
+```{r echo=FALSE}
+ggplot(top_5_vuelos_destinos, aes(x=carrier, y=cantidad_vuelos, fill=dest_name)) + 
+  geom_bar(stat = "identity", width=0.7) +
+   geom_text(aes(y=cantidad_vuelos, label=cantidad_vuelos), vjust=1.6,color="white", size=3.5) +
+   scale_fill_manual(values=c("#E69F00", "#999999", "#FFA500", "#2A9D8F","#56B4E9")) +
+  labs(title= "Top 5 carriers con más vuelos por destino",subtitle = "Método de visualización 1: Gráfica en barra acumulada") + theme_light()
+```
+
+Esta gráfica en barra acumulada nos muestra los top 5 carrier en el eje X, la cantidad de vuelos realizados en el eje Y y su relleno es el destino a donde se dirige cada aerolínea. Debido a que es una gráfica acumulada y que American Airlines está dos veces con destinos diferentes en el top 5 la suma de ambas cantidades de vuelos hacen que se posicione en el número 1 con 14,491 vuelos. En 2do está Delta Airlines con destino a Hartsfield Jackson Atlanta Intl con 10,571 vuelos. En 3ro está US Airways con 8,632 vuelos con destino a Charlotte Douglas Intl. Por último está United Air Lines con 6,984 vuelos dirigidos a Chicago Ohare Intl. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+kkk<- ggplot(top_5_vuelos_destinos, aes(x=carrier, y=cantidad_vuelos, fill=dest_name)) + 
+  geom_col(stat = "identity", position = "dodge",width=0.7 ) +
+  geom_text(aes(y=cantidad_vuelos, label=cantidad_vuelos), vjust=1.6,position = position_dodge(0.7),color="white", size=3.5) +
+  scale_fill_manual(values=c("#E69F00", "#999999", "#FFA500", "#2A9D8F","#56B4E9")) +
+  labs(title= "Top 5 carriers con más vuelos por destino", subtitle = "Método de visualización 2: Gráfica en barra separada") + theme_light()
+kkk
+```
+
+A diferencia de la gráfica de barra acumulada anterior, esta es una gráfica de barra separada en donde se muestran los resultados de manera separada En el eje X se muestra los carriers o aerolíneas y en el eje Y la cantidad de vuelos realizados. A diferencia de los resultados de la gráfica anterior, American Airlines (AA) ya no está en la primera posición ya que sus destinos no se suman sino, que se presentan de manera individual. Ahora las posiciones son las siguientes: en 1ro esta Delta Airlines con destino a Hartsfield Jackson Atlanta Intl con 10,571 vuelos, en 2do está US Airways con 8,632 vuelos con destino a Charlotte Douglas Intl. En 3ro y 4to está American Airlines con 7,257 con destino a Dallas Fort Worth Intl y 7,234 con destino a Miami Intl y en 5to está United Air Lines con 6,984 vuelos dirigidos a Chicago Ohare Intl. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(top_5_vuelos_destinos, aes(x=carrier, y=cantidad_vuelos, fill=dest_name)) + 
+  geom_col(stat = "identity", position = "dodge") +
+  facet_grid ("dest") +
+  geom_text(aes(y=cantidad_vuelos, label=cantidad_vuelos), vjust=1.6,color="white", size=3.5) +
+  scale_fill_manual(values=c("#E69F00", "#999999", "#FFA500", "#2A9D8F","#56B4E9")) +
+  labs(title= "Top 5 carriers con más vuelos por destino", subtitle = "Método de visualización 3: Gráfica en barra individual") + theme_light() 
+```
+
+Por último, esta gráfica es una de barra individual en donde se muestra cada una de las aerolíneas de manera individual en 5 pequeñas gráficas apartes. Esta última gráfica nos da los mismo resultados que la gráfica anterior en donde en 1ro está Delta Airlines, en 2do está US Airways, en 3ro y 4to está American Airlines y en 5to está United Airlines. La mayor diferencia con respecto a las gráficas anteriores es que esta es de manera individual  y que en la columna derecha muestra las siglas del destinos de cada aerolínea a pesar de que ya se muestra su nombre por los colores. 
+
+
+### Conclusiones y propuesta 
+En los avances anteriores se han realizado diferentes análisis y ahora nos solicitan hacer visualizaciones de la aerolínea American Airlines. Dentro de estas visualizaciones se encontraron varias observaciones de valor. Una de ellas son los retrasos en los vuelos de AA y aqui pudimos ver que American Airlines tiene un total de 6,668 vuelos retrasado  (sin contar los nulos). Si lo comparamos con el total de vuelos (32,729 vuelos) que hizo American Airlines en el 2013, significa que el 20.37% de sus vuelos están retrasados. Igualmente, este análisis de retrasos nos dio el insight que hay una alta relación entre los retrasos de salida con los retrasos de llegada, lo que significa que si un vuelo de AA sale tarde es muy probable que este llegue tarde a su destino. Esta observación es muy importante en cuanto a la satisfacción al cliente. Por lo general, a los clientes no les gustan las tardanza en sus vuelos y si hay un 20% de chance de que estos se retrasen, puede que AA pierda clientes ante la competencia con un porcentaje menor. 
+
+Otra observación es que de los top 10 aerolíneas con más vuelos que salieron de Nueva York en 2013, AA ocupa el 5to lugar con sus 32,729 vuelos. Este 5to lugar representa el 9.88% del total que al compararlos con el porcentaje de la competencia por encima de AA (United, Delta, Jetblue y ExpressJet) la diferencia esta de 4 a 7 puntos porcentuales. Igualmente, en las gráficas del top 5 carriers con más vuelos por destino, la gráfica de barra acumulada AA ocupa el primer lugar por la suma de sus dos puestos, mientras que en las gráfica separada e individual AA ocupa el 3er y 4to lugar (por debajo de Delta y US Airways). Esto nos deja saber que tan competitivo esta AA en la industria y considero que no está mal. Sin embargo, creo que AA tiene oportunidades de crecer al aumentar su cantidad de viajes.
+
+Dado a estas dos observaciones se tiene dos propuestas finales: La primera propuesta es la ya mencionada anteriormente en las conclusiones de Modelo Entidad-Relación. Al tener en cuenta los análisis y resultados de los top 10 aerolíneas con más vuelo y el top 5 carriers con más vuelos por destino, considero que la propuesta mencionada ayudará a que AA pueda reposicionarse en la industria como una de las mejores y líderes al entregar valor al cliente al tener mayor presencia en el mercado mediante la variedad en opciones de vuelos, horarios y destinos populares.
+
+La segunda propuesta es mejorar la logística de los trayectos de los aviones para bajar el porcentaje de tardanza de los vuelos. Con los resultados lanzados del análisis mencionado anteriormente, el 20.37% de los vuelos de AA están retrasados lo cual puede generar un descontento a su clientela y puede que se vayan con la competencia que tenga menor porcentaje de tardanza. Dado a esta situación propongo que AA invierta en tecnologías para permitir rutas de vuelo más eficientes y que la misma aerolínea se alinee con el control de tráfico aéreo para coordinar horas de llegada y salida de los aeropuertos sin que estos se saturen. Esta propuesta beneficiará al medio ambiente, a la aerolínea y a los clientes. El horario de arrastre genera mayores costos en el consumo de combustible, ruido y CO2, lo cual significa que si la eficiencia de la aerolínea aumenta, los costos disminuyen, lo que beneficia tanto al medio ambiente como a las tarifas. En el caso de los clientes, esto representa un valor agregado con lo que  muchos de los clientes estarán felices. 
+
+## Compromiso ético y ciudadano
+
+#### Valor de la integridad.
+Cuando se habla de una persona íntegra se está haciendo referencia al valor de vivir con una rectitud, bondad y honradez que se entienda como intachable, es decir, que no tenga ninguna circunstancia por la que pueda avergonzarse ni arrepentirse. La integridad es la fortaleza de espíritu que nos hace permanecer fieles a nuestros principios. Delimas, 2020)
+
+Ser íntegro significa vivir con honradez, honestidad, lealtad, sinceridad, respeto por los demás y por uno mismo y saber controlar nuestras emociones. Desde el punto de vista ético, sería la manera de manejarse coherentemente con los valores personales y compartidos con la comunidad a la que se pertenece. La Integridad es uno de los valores por los que rige la estructura de pensamiento y comportamiento, sus acciones se orientarán al perfeccionamiento, la honestidad, la cooperación, y otros valores positivos, lo que lo hará una persona confiable en su entorno, garantizando así vínculos afectivos y profesionales basados en la confianza. (Delimas, 2020)
+
+#### Reflexión personal:
+Considero que podemos actuar con respeto y honestidad en el uso de los datos cuando mantenemos una forma ética en el tratamiento, almacén de datos, administración, y manipulación de los datos de manera que estén alineados con nuestros principios y los de la empresa. 
+
+Considero esto imprescindible  para el éxito a largo plazo de cualquier organización. Para los profesionales de la gestión de datos y las organizaciones para las que trabajan, la ética de datos es una cuestión de responsabilidad social. Hay que ser sensibles con los datos ajenos, ya que al ser utilizado de manera no ética o ilegal puede causar problemas tanto profesionalmente como personalmente.
+
+#### Bibliografías: 
+
+Delimas. (2020, June 4). Integridad como valor | ¿Qué es? -> Definición y ejemplos. Retrieved March 11, 2021, from https://vive-sano.org/valores-fundamentales/integridad-como-valor/ 
+
+IDG Communications S.A.U. (2018, January 19). La transparencia y ética en el uso de la información otorgan confianza y valor añadido a los ciudadanos. Retrieved March 11, 2021, from https://www.computerworld.es/tendencias/la-transparencia-y-etica-en-el-uso-de-la-informacion-otorgan-confianza-y-valor-anadido-a-los-ciudadanos#:%7E:text=La%20%C3%A9tica%20en%20el%20tratamiento,est%C3%A9n%20alineados%20con%20estos%20principios. 
+
+La ética en la gestión de los datos. (2017b, November 29). Retrieved March 11, 2021, from https://datos.gob.es/es/noticia/la-etica-en-la-gestion-de-los-datos-0 
+
