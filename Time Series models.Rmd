@@ -1,0 +1,454 @@
+---
+title: "Evidence 1: Predictive Model Report."
+author: "Chantal Simó A00827554"
+date: "8/22/2021"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: TRUE
+    toc_float:
+      smooth_scroll: FALSE
+      collapsed: FALSE
+editor_options: 
+  chunk_output_type: inline
+---
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(foreign)
+library(stats)
+library(tidyverse)  
+library(lubridate)  
+library(scales)    
+library(ggplot2)    
+library(graphics)    
+library(hrbrthemes) 
+library(extrafont)  
+library(pastecs)
+library(dbplyr)
+library(readr)
+library(funModeling)  
+library(Hmisc)
+library(regclass) 
+library(stargazer)    
+library(jtools)      
+library(effects)
+library(huxtable)
+library(Metrics)
+library(ggstance)
+library(lmtest)
+library(car)
+library(tidyverse)
+library(caret)
+library(glmnet)
+#------------------
+library(moonBook)
+library(devtools)
+library(ggiraphExtra)
+library(plyr)
+library(ggiraph)
+library(skimr)
+library(openxlsx)
+```
+
+
+# Introduction
+There are statistical techniques that allow us to estimate the behavior of various factors that could be important in the performance or development of companies. For example, we can estimate what will be the behavior of a company's sales, what will be the behavior of demand, the exchange rate, the inflation, the country's growth, the Gross Domestic Product, and practically any internal indicator, or any macroeconomic indicator of a country. (Milenio, 2014) For this problematic situation, we are going to propose, develop and analyze econometric models in order to see which of them is adjusted to predict the result using regression analysis. By using the regression analysis as a statistical technique we are able to determine the relationship between a single dependent (criterion) variable and one or more independent (predictor) variables in order to predict values for the criterion resulting from a linear combination of the predictors.
+
+# Background
+Arca Continental is a company dedicated to the production, distribution, and sale of beverages under highly recognizable brands in Latin America and the United States. Also, is known for being the second-largest Coca-Cola bottling company in Latin America and one of the most important in the world. It serves more than 118 million consumers in Mexico, Argentina, Ecuador, United States, and Peru. 
+**Financial reports:** For this problematic situation, we reviewed Arca Continental's financial reports from 2015 to 2018 where the following insights were found: The average annual increase in net profit is 21%, the sales volume of the 15% and net sales 26%.On the other hand, Assets have a constant increase while liabilities do not, due to the increase in debts in 2017 by 77% compared to the previous year. There was no debt recovery since then. However, I consider that the company as such has had good growth in general in its sales and net income, so it could be estimated that the investment made in 2017 may lead to a greater increase in profits in the future.
+
+# Description of the problem situation
+
+**Problem Situation Question: How many cases of soft drinks Coca-Cola produces to supply the demand of the Guadalajara Metropolitan area?** Arca Continental Coca-Cola is the second-largest Coca-Cola bottling company in Latin America and one of the most important in the world. The objective of this problem situation with Arca Continental is to learn all that is involved in building a predictive model for the data of this large company. Considering the information generated over time in the company, we seeks to identify those factors that influence the behavior of the sales, by building significant models in order to forecasts the target variable and thus contribute to strategic decision making. Before the construction of the model, a documentary immersion into the company's data and a review of the various methods of forecasting prediction must be done. The final objective is to deliver a sales forecast using regression analysis on the proposed models and also, be able to carry out an analysis of how many products this company has to produce to supply the market demand taking into account all those factors that affect the behavior of sales and financial results.
+
+# Data and methodology
+
+## Statment of Theory
+
+In this problem situation, we have the statement of theory or problem where we have to identify which are the factors that affect the sales of the soft drinks Coca-Cola produces to supply the demand of the Guadalajara Metropolitan area. By identifying does factors that influence its behavior, we intend to build some models and identify who fits more in order to forecasts the target variable and thus contribute to strategic decision making by seeing how these factors impact the company and predict their economic and financial consequences. 
+
+## Econometric Model Specification
+
+The econometric model that will be used to solve the statement of theory would be developed using the Multiple Linear Regression Model (MLRM) and Polynomial Regression Model (PRM). All of this will be visualized with the Ordinary Least Squares Method (OLS) in order to visualize the data in a simpler and more intuitive way to estimate and interpret the regressions. Also, the OLS minimizes the differences between the collected observations in some arbitrary data set and the responses predicted by the linear approximation of the data in order to express the estimator by a simple formula and better interpretation.
+
+## Cleaning the Data
+
+**Data Sources and Study Period **
+
+The data source used to create the models is from the "cocacolasales.csv" database where it shows by year and month the financial data and the sales behavior environment.
+```{r results='hide'}
+# Importing time series dataset
+setwd("/Users/chantalasimog/Desktop/Evidence ")
+data <- read.csv("cocacolasales1.csv")
+```
+
+From this we identified the variables for the model: 
+
+- *Dependent variable (Y)*: "sales_unitboxes"
+- *Independent variable (X)*: "tperiod", "inflation_rate", "itaee_growth", "exchange_rate", "unemp_rate", "pop_density", "max_temperature", "consumer_sentiment", "gdp_percapita", "job_density", "holiday_month", "CPI", "itaee" & "pop_minwage"
+
+
+**Explanatory data analysis**
+```{r}
+# Visualize the data type and the data of each field
+glimpse(data)
+```
+With this function we see that the type of data that are the variables. Here we have variables that are  identified as numeric or character but some of them should be fixed, for example: tperiod should be date and holiday_month should be factor. 
+
+```{r}
+# Visualize the measures of central tendency, quartiles, skewness, ranges and kurtosis
+profiling_num(data)
+```
+With this function we obtain the average, standard deviation, coefficient of variation, quartiles and quintile, skewness, kurtosis and ranges of all the numerical variables in the database.
+
+```{r}
+# Visualize that the data is correct and there is no NAs or NULLs
+summary(data)
+```
+This function shows us a summary about the information of each field of the database. Its result depends on whether the data type is numeric or character. In the case of numeric variable it show us the Min, Max, average, median and quartiles. With the  character variables it only shows the class, length and mode.
+
+**Cleaning and organization the data**
+```{r results='hide'}
+# Changing to factor data type this variable:
+data$holiday_month <-as.factor(data$holiday_month)
+str(data$holiday_month)
+# Changing to date data type this variable:
+data$tperiod <- as.Date(data$tperiod, format = "%m/%d/%Y")
+str(data$tperiod)
+```
+As we saw earlier, with the STR function there are some identify variables that have the wrong data type. In this case we fixed the variable Holiday month from numeric to factor and the variable Tperiod from character to date. With this fixed, all the data set is clean and organize. 
+
+```{r}
+# Making sure that the data type is correct
+str(data)
+```
+
+```{r}
+# Making sure that the data is correct
+skim(data)
+```
+Finally, it shows us a general summary of all the content of the database. Its result depends on whether the data type is numeric, character, or factor. In the case of the numerical variable, it shows us the NA, full rate, mean, standard deviation, quartiles and a small histogram to see the skewness For character variables, it shows NAs, full rate, minimum, maximum, empty spaces, unique values, and blanks.
+
+## Visualization 
+
+**Numeric Variables Visualization **
+
+For the visualization of the data we will be seeing how the data is distributed for the numeric variables. For the numeric variables we will be observing how the data is structured, by seeing a little histogram of the data for detecting the skewness on the histogram show below. 
+```{r message=FALSE, warning=FALSE}
+plot_num(data) 
+```
+
+**Factor Variables Visualization **
+
+In this case with the factor variable, we will be seeing how the data is distributed for the factor. Here it will show how the factor are distributed by their frequency and show the percentage it represent. 
+```{r message=FALSE, warning=FALSE}
+freq(data$holiday_month)
+```
+
+**Sales through Time Visualization **
+
+Here we have an interesting graph that shows the behavior of the company's sales from 2015 to 2018. This graph helps us to visualize how sales have been, which are the months with the highest and lowest sales, comparative annual sales status, among other things. Likewise, a line was added in the middle that presents the sales trend during this year. With this, we see if sales have increased or decreased.
+
+```{r message=FALSE, warning=FALSE}
+ggplot(data, mapping = aes(x = tperiod, y = sales_unitboxes)) +
+  geom_line(color = "navyblue") + 
+  geom_point() +
+  stat_smooth() +
+  theme_light() +
+  scale_y_discrete(limits = c(5500000,6000000,6500000,7000000,7500000,8000000)) +
+  labs(title="Sales Behavior of 2015-2018")
+```
+
+**Sales when it have a Holiday Month **
+
+On the other hand, here we have the distribution of sales in a histogram where you can see the difference in sales when there is a holiday month (1) and when there is not (0).
+```{r message=FALSE, warning=FALSE}
+ggplot(data, aes(x=sales_unitboxes, fill=holiday_month, color=holiday_month)) + 
+  geom_histogram(position="identity", alpha=0.5)+
+  theme_light() +
+  labs(title="Sales Behavior with and without Holiday month")
+```
+
+
+# Results analysis
+
+**Correlation Test**
+
+First of all, a correlation test will be carried out to verify which are the independent variables that we will use in the model. This is due to the fact that it is intended to look for variables that do have a good degree of significance and confidence with respect to the dependent variable in order to be able to more accurately predict the impact of these variables. The variables that seem to have a good correlation with "Sale Unit Box" will be taken into account for the creation of the proposed models. 
+```{r results='hide'}
+data_num <- data[,unlist(lapply(data, is.numeric))]
+round(cor(data_num), digits = 3)
+```
+When we look for the correlation we look for it to have a strong correlation with the "Sale Unit Box" variable. With this in mind, these variables were chosen for the realization of the models:
+
+- **Elected Main Variables:** "inflation_rate", "exchange_rate", "unemp_rate", "pop_density", "max_temperature", "consumer_sentiment","holiday_month" & "itaee"
+
+```{r echo=FALSE}
+datamodel <- data %>% select(sales_unitboxes,inflation_rate,exchange_rate,unemp_rate,
+                             pop_density,max_temperature,consumer_sentiment,itaee)
+library(corrplot)
+corrplot(cor(datamodel),
+         method = "number",
+         type = "upper" )
+```
+
+## Economic models
+As mentioned before, the Multiple Linear Regression Model (MLRM) and Polynomial Regression Model (PRM) will be used in order to analysis the models proposed. All of this will be visualized with the Ordinary Least Squares Method (OLS) in order to visualize the data in a simpler and more intuitive way to estimate and interpret the regressions.
+
+**Model 1: Multiple Linear Regression Model**
+```{r}
+model1<-lm(sales_unitboxes~inflation_rate+exchange_rate+unemp_rate+itaee+consumer_sentiment+
+             pop_density+max_temperature+holiday_month,data = data) 
+#summary(model1)
+```
+Model 1 results: 
+- p-value = 2.149e-07
+- R-squared = 0.6703
+- Adjusted R-squared = 0.6027 
+- Confidence level = 99%
+
+**Model 2: Multiple Regression Model (Logarithmic)**
+```{r}
+model2<-lm(log(sales_unitboxes)~inflation_rate+log(exchange_rate)+log(unemp_rate)+log(itaee)+
+             log(consumer_sentiment)+log(pop_density)+max_temperature+holiday_month,data = data) 
+#summary(model2)
+```
+Model 2 results: 
+- p-value = 1.381e-07
+- R-squared = 0.6782
+- Adjusted R-squared = 0.6122 
+- Confidence level = 99%
+
+**Model 3: Multiple Regression Model (Logarithmic)**
+```{r}
+model3<-lm(log(sales_unitboxes)~lag(log(sales_unitboxes))+inflation_rate+log(exchange_rate)+log(unemp_rate)+ log(itaee)+log(consumer_sentiment)+log(pop_density)+max_temperature+holiday_month,data = data)
+#summary(model3)
+```
+Model 3 results: 
+- p-value = 3.49e-07
+- R-squared = 0.6925
+- Adjusted R-squared = 0.6178 
+- Confidence level = 99%
+
+**Model 4: Polynomial Linear Regression Model**
+```{r}
+model4<-lm(log(sales_unitboxes)~lag(log(sales_unitboxes))+inflation_rate+log(exchange_rate)+
+             log(unemp_rate)+ log(itaee)+log(consumer_sentiment)+log(pop_density)+max_temperature+
+             I(max_temperature^2)+ holiday_month,data = data)
+#summary(model4)
+```
+Model 4 results: 
+- p-value = 1.998e-07
+- R-squared = 0.723
+- Adjusted R-squared = 0.6461 
+- Confidence level = 99%
+
+**Model 5: Multiple Regression Model (Logarithmic)**
+This model arose due to the change of the variable "log (unemp_rate)" for the "log (pop_minwage)" because this new variable has a more positive correlation and less heteroscedasticity
+```{r}
+model5<-lm(log(sales_unitboxes)~lag(log(sales_unitboxes))+inflation_rate+ log(exchange_rate)+log(pop_minwage)+
+             log(itaee)+log(consumer_sentiment)+ pop_density+max_temperature+holiday_month,data = data)
+#summary(model5)
+```
+Model 5 results: 
+- p-value = 2.537e-07
+- R-squared = 0.6982
+- Adjusted R-squared = 0.6248 
+- Confidence level = 99%
+
+**Model 6: Multiple Regression Model (Logarithmic)**
+This model was created under the criteria of being able to find how to have a model with greater confidence (adjusted R) and with variables that have multicollinearity with a value less than 10.
+```{r}
+model6<-lm(log(sales_unitboxes)~lag(log(sales_unitboxes))+log(exchange_rate)+ log(itaee)+
+           log(consumer_sentiment)+log(pop_density)+max_temperature+holiday_month,data = data)
+#summary(model6)
+```
+Model 6 results: 
+- p-value = 2.852e-08
+- R-squared = 0.6917
+- Adjusted R-squared = 0.6363 
+- Confidence level = 99%
+
+## Model diagnostics
+
+**Akaike Information Criterion (AIC)**
+
+The Akaike information criterion (AIC) is a mathematical method for evaluating how well a model fits the data it was generated from. In statistics, AIC is used to compare different possible models and determine which one is the best fit for the data. The lower the AIC the better the quality of the regression model results.
+```{r message=FALSE, warning=FALSE}
+# Akaike Information Criterion (AIC)
+AIC(model1,model2,model3,model4,model5,model6)
+```
+
+**Root Mean Square Error (RMSE)**
+
+Root Mean Square Error (RMSE) is the standard deviation of the residuals (prediction errors). Residuals are a measure of how far from the regression line data points are or in other words, a measure of how spread out these residuals are. This tells you how concentrated the data is around the line of best fit. The lower the RMSE the better the model's performance.
+```{r}
+# Root Mean Square Error (RMSE)
+prediction1 <- model1 %>% predict(data)
+RMSE(prediction1,data$sales_unitboxes)
+
+prediction2 <- model2 %>% predict(data)
+RMSE(prediction2,data$sales_unitboxes)
+
+prediction3 <- model3 %>% predict(data)
+RMSE(prediction3,data$sales_unitboxes)
+
+prediction4 <- model4 %>% predict(data)
+RMSE(prediction4,data$sales_unitboxes)
+
+prediction5 <- model5 %>% predict(data)
+RMSE(prediction5,data$sales_unitboxes)
+
+prediction6 <- model6 %>% predict(data)
+RMSE(prediction6,data$sales_unitboxes)
+```
+
+**Multicolinearity Test**
+
+For the regression model diagnostic here we are going to use the multicollinearity test which is the liner relationship among the independent variable X. Multicollinearity exists whenever an independent variable is highly correlated with one or more of the other independent variables in a multiple regression equation. We determined multicollinearity when the value is greater than 10. If identify, this would be a problem because it undermines the statistical significance of an independent variable.
+```{r}
+# Detecting Multicolinearity with the Variance Inflation Factors (VIF)
+VIF(model1) 
+VIF(model2) 
+VIF(model3) 
+VIF(model4) 
+VIF(model5) 
+VIF(model6)
+```
+
+**Heteroscedasticity Test**
+
+On the other hand, it is used to test for heteroscedasticity in a linear regression model and assumes that the error terms are normally distributed. It tests whether the variance of the errors from a regression is dependent on the values of the independent variables. Depending on the results, if p-value is less than 0.01 we reject the null hypothesis of homoscedasticity that is, we have evidence to suggest that heteroscedasticity is present in the regression model. On the contrary, if p-value is greater than 0.01 we have evidence to suggest that homoscedasticity is present in the regression model,meaning an assumption of equal or similar variances in different groups being compared.
+```{r}
+# Detecting Heteroscedasticity
+bptest(model1)
+bptest(model2)
+bptest(model3)
+bptest(model4)
+bptest(model5)
+bptest(model6)
+```
+
+
+### Which Model Fits better?
+```{r}
+# RESULTS
+Model <- c('Model 1','Model 2','Model 3','Model 4','Model 5','Model 6')
+RMSE <- c(340195.7,6500729,NA,NA,NA,NA)
+AIC <- c(1379.00,-127.18,-126.21,-129.12,-127.09,-130.08)
+R_Adjusted <- c(0.6027,0.6122,0.6178,0.6461,0.6248,0.6363)
+BPtest <- c(0.875,0.822,0.512,0.417,0.539,0.431)
+selection <- data.frame(Model,RMSE,AIC,R_Adjusted,BPtest)
+selection
+```
+As you can see in the table above, here we have the diagnostic results of each model. Root Mean Square, AIC, R Adjusted, Heteroscedasticity, and Multicollinearity were tested on each and we get to the conclusion that **Model 6** is the best one to fits for the following reasons: 
+
+- Model 6 have the lowest AIC meaning this model have the better  quality of the regression model results.
+- Model 6 have one of the highest R adjusted, meaning it have a great level of confidence to explain the behavior of sales (dependent variable)
+- Model 6 have the lowest multicollinearity problem and have one of the lowest heteroscedasticity problem of all the models.
+- Lastly, Model 6 have one of the best p-value overall with a confidence level of 99%. 
+
+**OLS Regression Results for Model 6** 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+stargazer(model6,type="text",title="OLS Regression Model6 Results",
+          single.row=TRUE,ci=FALSE,ci.level=0.9)
+```
+
+
+##  Prediction 
+```{r echo=FALSE}
+summ(model6, digits = 3, model.info = FALSE, model.fit = FALSE)
+```
+
+Lastly, for this section we will see how these independent variables can forecasting the sales results in the future. Here we will be looking at the impact of each of the independent variables to know the effect on the results of the dependent variable.
+
+First we have this formula that indicates us how this model impact de Sales (dependent variable) 
+
+*Sales= 18.505143 + 0.227921 X1 -0.101766 X2 + 1.932014 X3 + 0.280504 X4 -3.696548 X5 +0.025439 X6 +0.027565 X7*
+
+- **lag(log(sales Unit Boxes)) (X1)**: An increase in *Sales Unit boxes* in one logarithmic unit would increase the sales in approximately 0.228, holding everything constant. 
+- **log (Exchange Rate) (X2)**: An increase in *Exchange Rate* in one logarithmic unit would decrease the sales in approximately -0.102, holding everything constant.
+- **log (Itaee) (X3)**: An increase in the *Indicator of the State Economic Activity* in one logarithmic unit would increase the sales in approximately 1.932, holding everything constant.
+- **log (Consumer Sentiment) (X4)**: An increase in the *Consumer Sentiment* in one logarithmic unit would increase the sales in approximately 0.281, holding everything constant.
+- **log (POP Density) (X5)**: An increase in the *Population per KM^2* in one logarithmic unit would decrease the sales in approximately -3.697, holding everything constant.
+- **Max Temperature (X6)**: An increase in*Temperature* in one unit would increase the sales in approximately 0.025, holding everything constant.
+- **Holiday Month (X7)**: During *Holiday Month* sales would approximately increase by 0.028, holding everything constant.
+- Holding everything constant the sales would increase by 18.505
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(broom.mixed)
+plot_summs(model6) + 
+  labs(title = "Estimated Model Predicton for each variable")
+```
+
+**Fun Fact: Why using log?** Logarithmic transformation is a convenient means of transforming a highly skewed variable into a more normalized data set. When modeling variables with non-linear relationships, the chances of producing errors may also be skewed negatively. 
+
+##  Prediction Visualization
+Finally here we have in a graphical way to show how the effect of the independent variable on the sales in unit box. They are organized in the same way as the previous point. It should be noted that the interpretation of each of the graphs is the same as those already mentioned above in the prediction. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("lag(log(sales_unitboxes))",model6), 
+     main="Predicted Sales according to Sales",
+     xlab="Sales", ylab="Sales Unit Boxes")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("log(exchange_rate)",model6), 
+     main="Predicted Sales according to the Exchange Rate",
+     xlab="Exchange Rate", ylab="Sales Unit Boxes")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("log(exchange_rate)",model6), 
+     main="Predicted Sales according to the Exchange Rate",
+     xlab="Exchange Rate", ylab="Sales Unit Boxes")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("log(itaee)",model6), 
+     main="Predicted Sales according to Indicator of the State Economic Activity",
+     xlab="Indicator of the State Economic Activity", ylab="Sales Unit Boxes")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("log(consumer_sentiment)",model6), 
+     main="Predicted Sales according to Consumer Sentiment",
+     xlab="Consumer Sentiment", ylab="Sales Unit Boxes")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("log(pop_density)",model6), 
+     main="Predicted Sales according to Population per KM^2",
+     xlab="Population per KM^2", ylab="Sales Unit Boxes")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(effect("max_temperature",model6), 
+     main="Predicted Sales according to Temperature",
+     xlab="Max Temperature", ylab="Sales Unit Boxes")
+```
+
+
+# Conclusions and recommendations
+
+To conclude, with all the analysis done we can draw many insides that can be of use and value for the Arca Continental company. Fore response to our problem situation, monthly data from 2015 to 2018 were obtained from Arca Continental to make a model that can predict the behavior of sales in boxes of units to supply the demand of the Guadalajara Metropolitan area. The data was cleaned and organized correctly and after a comprehensive diagnosis and several tests on the different model proposals, it was concluded that model 6 is the indicated model to be able to predict sales in unit boxes. Taking into account Arca Continental's financial statements and the model chosen to predict, it is estimated that sales and profits can continue to grow and debt will be reduced. With this model, the company will be prepared to know what are the factors that can produce an increase in sales in unit boxes, as well as how they can supply the demand at any time.
+
+## Recomendations: 
+
+As mentioned above, the model was selected due to its superiority in correlation, confidence, and impact that it has concerning the behavior of sales in unit boxes. Within it, there are several independent variables where each has its explanatory level for the sales. For example, the Indicator of the State Economic Activity (Itaee) is one of the variables that most impact sales if it rises, holding everything constant. There is also Population per KM ^ 2 where if it increases, sales will decrease, holding everything constant. Therefore, it is highly recommended to review the independent variables proposed and their individual impact on sales.
+
+On the other hand, although this model can predict certain aspects, it is highly recommended that the company always be attentive to changes in the environment such as economic, political, social, and technological changes since these can also affect sales and demand for products. In addition, the investments made by the company (shown in their financial statement) to innovate are of great help to be able to satisfy the demand more effectively, however, it is recommended that they be attentive to both external changes and the variables of the chosen model to continue growing in the industry.
+
+# References
+- Arcacontinental. (n.d.). CULTURA ORGANIZACIONAL. Arcacontal. Retrieved August 22, 2021, from https://www.arcacontal.com/nuestra-compa%C3%B1%C3%ADa/cultura-organizacional.aspx
+- Arca Continental. (n.d.). FINANCIAL REPORTS. Arca Continental Financial-Reports. Retrieved August 26, 2021, from https://www.arcacontal.com/investors/financial-reports.aspx
+- Arca Continental. (n.d.-b). NUESTRA COMPAÑÍA. ArcaContal. Retrieved August 26, 2021, from https://www.arcacontal.com/nuestra-compa%C3%B1%C3%ADa.aspx
+- Bevans, R. (2021, June 18). An introduction to the Akaike information criterion. Scribbr. https://www.scribbr.com/statistics/akaike-information-criterion/
+- RMSE: Root Mean Square Error. (2021, June 1). Statistics How To. https://www.statisticshowto.com/probability-and-statistics/regression-analysis/rmse-root-mean-square-error/
+- Tecnológico de Monterrey. (2021). Home Page. Experiencia21. https://experiencia21.tec.mx/courses/203571/pages/homepage
+- Tecnológico de Monterrey. (2021). Problem Situation. Experiencia21. https://experiencia21.tec.mx/courses/203571/pages/problem-situation
+
+
+
+
